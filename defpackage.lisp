@@ -10,7 +10,7 @@
    #:*compress-streams* #:*zlib-search-paths* #:*zlib-loaded* #:load-zlib
    #:*afm-files-directories* #:*default-encoding*
    #:load-fonts #:get-font #:font #:clear-font-cache #:name #:encoding #:font-metrics #:add-font-to-page
-   #:font-name #:full-name #:family-name #:weight #:font-bbox #:versiondf #:notice #:encoding-scheme
+   #:font-name #:full-name #:family-name #:weight #:font-bbox #:*version* #:notice #:encoding-scheme
    #:characters #:code #:width #:bbox #:kernings #:get-char #:get-char-width #:get-char-size
    #:get-kerning #:hyphen-char #:mapping-scheme
    #:get-char-italic-correction #:get-font-italic-correction

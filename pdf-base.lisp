@@ -150,10 +150,11 @@
 
  (:method ((color vector))
   #+lispworks
-  (case (aref color 0)		; convert from (color:make-rgb ...) or other model
-    ((numberp (aref color 0))	(values (aref color 0)(aref color 1)(aref color 2)))
-    (:RGB	(values (aref color 1)(aref color 2)(aref color 3)))
-    (:GRAY	(values (aref color 1)(aref color 1)(aref color 1))))
+  (if (numberp (aref color 0))
+      (values (aref color 0)(aref color 1)(aref color 2))
+      (case (aref color 0)		; convert from (color:make-rgb ...) or other model
+	(:RGB	(values (aref color 1)(aref color 2)(aref color 3)))
+	(:GRAY	(values (aref color 1)(aref color 1)(aref color 1)))))
   #-lispworks
   (values (aref color 0)(aref color 1)(aref color 2)))
 
