@@ -4,8 +4,8 @@
 
 (in-package pdf)
 
-;;WARNING this part of cl-pdf is an early alpha version. Use with care!
-;;Basic (and crude) text layout functions
+;;; Basic (and crude) text layout functions
+;;; use cl-typesetting for nice text layout functions
 
 (defun text-width (string font font-size)
   (loop for c across string

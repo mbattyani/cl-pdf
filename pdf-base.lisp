@@ -223,11 +223,14 @@
 
 (defparameter +jpeg-color-spaces+ #("?" "/DeviceGray" "?" "/DeviceRGB" "/DeviceCMYK"))
 
-(defclass jpeg-image ()
+(defclass bitmap-image ()
   ((width  :accessor width :initarg :width)
    (height :accessor height :initarg :height)
    (nb-components :accessor nb-components :initarg :nb-components)
    (data   :accessor data :initarg :data)))
+
+(defclass jpeg-image (bitmap-image)
+  ())
 
 (defun %read-jpeg-file% (filename)
   (with-open-file (s filename :direction :input :element-type '(unsigned-byte 8))
@@ -257,10 +260,8 @@
       (make-instance 'jpeg-image :nb-components nb-components
 		     :width width :height height :data data))))
 
-(defmethod make-jpeg-image ((jpeg jpeg-image))
-  (make-instance 'pdf:image :bits (data jpeg) :width (width jpeg) :height (height jpeg)
-		 :filter "/DCTDecode" :color-space (aref +jpeg-color-spaces+ (nb-components jpeg))
-		 :no-compression t))
+(defmethod make-jpeg-image (jpeg)
+  (make-image jpeg))
 
 (defmethod make-jpeg-image ((pathname pathname))
   (make-jpeg-image (read-jpeg-file pathname)))
@@ -268,3 +269,24 @@
 (defmethod make-jpeg-image ((string string))
   (make-jpeg-image (read-jpeg-file string)))
 
+(defgeneric make-image (object &key type &allow-other-keys)
+ (:documentation "Returns more than just one pdf:image object when mask is supplied"))
+
+(defmethod make-image ((object pathname) &rest args &key (type (pathname-type object)))
+  (cond ((member type '("jpeg" "jpg") :test #'equalp)
+         (apply 'make-image (read-jpeg-file object) args))
+        ((equalp type "png")
+         (apply 'make-image (read-png-file object) args))
+        (t (error "Unsupported image file type ~s." type))))
+
+(defmethod make-image ((object string) &rest args &key type)
+  (apply #'make-image (merge-pathnames object (make-pathname :type type))
+         args))
+
+(defmethod make-image ((jpeg jpeg-image) &key)
+  (make-instance 'pdf:image
+         :bits (data jpeg)
+         :width (width jpeg) :height (height jpeg)
+         :filter "/DCTDecode"
+         :color-space (aref +jpeg-color-spaces+ (nb-components jpeg))
+         :no-compression t))

@@ -28,6 +28,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;  FIXES.
 ;;; (v. 1.2-ansi)
+;;;  2004-11-30 - Joerg Hoehle: a dozen small fixes to various functions
 ;;;  2003-12-16 - Tested a bit more, implemented FOR-HASHTABLE and
 ;;;               FOR-PACKAGES (FOR-PACKAGE) iteration CLtS-style
 ;;;               using (with-{package,hashtable}-iterator)
@@ -57,9 +58,6 @@
 ;;;
 ;;; - We should look at function type declarations, at least at the
 ;;;   result type, and record them.
-;;;
-;;; - Consider allowing (locally...).  The semantics would be quite
-;;;   odd, however.
 ;;;
 ;;; - Consider adding an if-never keyword to find...max/min
 ;;;
@@ -99,7 +97,6 @@
 ;;;  - change WALK and FREE-VARIABLES to take symbol macros into account
 ;;;  - array indices are fixnums
 ;;;  - type REAL for extremum clauses
-;;;  - everything but symbols and lists are self-evaluating.
 
 ;;; Maybe:
 ;;;  - decls can appear not at top level, as long as they appear before use.
@@ -122,28 +119,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-;;; Some of the 7 extremely random interface commands:
+(in-package #:iterate)
 
-;;; use strings here so that there's no iterate symbol in USER.
-
-(in-package #:ITERATE)
-
-;;; XXX: huh - portable?
-  ;; (proclaim '(declaration declare-variables))
+(declaim (declaration declare-variables))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Constants and global variables.
-(defconst version "1.2" "Current version of Iterate")
+(defconst version "1.3" "Current version of Iterate")
 
 
 
-(defconst standard-type-symbols
-  '(array atom bignum bit bit-vector character common compiled-function
+(defconst standard-type-symbols ; of CLtL2
+  '(array atom bignum bit bit-vector boolean character compiled-function
     complex cons double-float fixnum float function hash-table integer
     keyword list long-float nil null number package pathname random-state
-    ratio rational readtable sequence short-float simple-array 
+    ratio rational readtable real sequence short-float signed-byte simple-array 
     simple-bit-vector simple-string simple-vector single-float standard-char
-    stream string string-char symbol t vector)
+    stream string string-char symbol t unsigned-byte vector)
   "Table 4-1 of the Common Lisp Manual")
 
 
@@ -166,7 +158,7 @@
     (single-float . ,most-positive-single-float)))
 
 
-;;; This is like (proclaim '(declare-variables)).
+;;; This is like (declare (declare-variables)).
 
 (defvar *always-declare-variables* nil)
 
@@ -216,10 +208,10 @@
 
 (defvar *top-level?*)
 
-;;; *binding-context?* is bound to T inside a form that can bind
-;;; variables (let, let*, multiple-value-bind, lambda).  We used to just see
-;;; if *internal-variables* was non-nil, but that's wrong--you can be inside a
-;;; binding context that binds no variables.
+;;; *binding-context?* a misnomer, should be named *declaration-context*, is
+;;; bound to T inside a form that allows declarations (flet, labels).  We used
+;;; to just see if *internal-variables* was non-nil, but that's wrong--you can
+;;; be inside a binding context that binds no variables.
 
 (defvar *binding-context?*)
 
@@ -256,6 +248,7 @@
 ;;;   :increment   for sum and count
 ;;;   :max         for maximize
 ;;;   :min         for minimize
+;;;   :if-exists   for always/never/thereis and finding such-that
 ;;; Note that we do not check for type conflict in the re-use of these
 ;;; variables.
 
@@ -281,37 +274,47 @@
 
 
 ;;; An alist of lisp special forms and the functions for handling them.
+;;; nil as function means leave form as-is.
 
 (defparameter *special-form-alist* 
-  '((block . 		   walk-cddr) 
-    (catch . 		   walk-cdr)
-    (compiler-let . 	   compiler-let-error)
-#+allegro (cond .	   walk-cond)   ;; allegro compiler treats cond
-    					;; as a special form
-    (declare . 		   walk-declare)
-    (eval-when . 	   walk-cddr)
-    (flet . 		   walk-flet)
-    (function . 	   walk-function)
-    (go . 		   nil)
-    (if . 		   walk-if)
-    (labels . 		   walk-flet)
-    (let . 		   walk-let)
-    (let* . 		   walk-let)
-    (macrolet . 	   walk-macrolet)
-    (symbol-macrolet . 	   walk-symbol-macrolet)
-    (multiple-value-bind . walk-multiple-value-bind)
-    (multiple-value-call . walk-cdr)
-    (multiple-value-prog1. walk-cdr)
-    (progn . 		   walk-progn)
-    (progv . 		   walk-cdr)
-    (quote . 		   nil)
-    (return-from . 	   walk-cddr)
-    (setq . 		   walk-setq)
-    (tagbody . 		   walk-cdr)
-    (the . 		   walk-cddr)
-    (throw . 		   walk-cdr) 
-    (unwind-protect . 	   walk-cdr)
-    (load-time-value .     nil)))
+  '(;; First the special operators that every code walker must recognize
+    (block . 		    walk-cddr) 
+    (catch . 		    walk-cdr)
+    (declare . 	 	    walk-declare)
+    (eval-when .  	    walk-cddr)
+    (flet . 		    walk-flet)
+    (function . 	    walk-function)
+    (go . 		    nil)
+    (if . 		    walk-if)
+    (labels . 		    walk-flet)
+    (let . 		    walk-let)
+    (let* . 		    walk-let)
+    (locally .              walk-locally)
+    (macrolet . 	    walk-macrolet)
+    (symbol-macrolet . 	    walk-symbol-macrolet)
+    (multiple-value-call .  walk-cdr)
+    (multiple-value-prog1 . walk-cdr)
+    (progn . 		    walk-progn)
+    (progv . 		    walk-cdr)
+    (quote . 		    nil)
+    (return-from . 	    walk-cddr)
+    (setq . 		    walk-setq)
+    (tagbody . 		    walk-cdr)
+    (the . 		    walk-cddr)
+    (throw . 		    walk-cdr) 
+    (unwind-protect . 	    walk-cdr)
+    (load-time-value .      nil)
+
+    ;; Next some special cases:
+    ;; m-v-b is a macro, not a special form, but we want to recognize bindings.
+    ;; Furthermore, Lispworks macroexpands m-v-b into some unknown m-v-BIND-call special form.
+    (multiple-value-bind .  walk-multiple-value-bind)
+    ;; Allegro treats cond as a special form, it does not macroexpand.
+    #+allegro (cond .	    walk-cond)
+
+    ;; Finally some cases where code compiled from the macroexpansion
+    ;; may not be as good as code compiled from the original form:
+    (nth-value .	    walk-cdr)))
 
 
 ;;; For clauses that are "special" in the sense that they don't conform to the
@@ -452,29 +455,25 @@
 	     (subbed-body (sublis (pairlis bvars args) body)))
 	`#'(lambda ,args ,.subbed-body))))
   
-  (set-dispatch-macro-character #\# #\L 'sharpL-reader)
+  (set-dispatch-macro-character #\# #\L #'sharpL-reader)
 
   (defun make-bang-var (n)
     (intern (format nil "!~d" n)))
 
   (defun list-of-forms? (x)
-    (and (listp x) (listp (car x))
+    (and (consp x) (consp (car x))
 	 (not (eq (caar x) 'lambda))))
 
   (defun bang-vars (form)
-    (delete-duplicates (bang-vars-1 form) :test #'eq))
+    (delete-duplicates (bang-vars-1 form '()) :test #'eq))
 
-  (defun bang-vars-1 (form)
+  (defun bang-vars-1 (form vars)
     (cond
-      ((symbolp form)
-       (if (bang-var? form)
-	   (list form)
-	   nil))
-      ((atom form)
-       nil)
-      (t
-       (nconc (bang-vars-1 (car form)) (bang-vars-1 (cdr form))))))
-
+      ((consp form)
+       (bang-vars-1 (cdr form)
+		    (bang-vars-1 (car form) vars)))
+      ((and (symbolp form) (bang-var? form)) (cons form vars))
+      (t vars)))
 
   (defun bang-var? (sym)
     (char= (char (symbol-name sym) 0) #\!))
@@ -511,7 +510,7 @@
 	 (*temps-in-use* nil)
 	 (*driver-info-alist* nil)
 	 (*block-name* (if (symbolp (car body))
-			   (prog1 (car body) (pop body))
+			   (pop body)
 			   nil))
 	 (*loop-top* (symbol-append 'loop-top- *block-name*))
 	 (*loop-step* (symbol-append 'loop-step- *block-name*))
@@ -524,28 +523,28 @@
       (multiple-value-bind (init step)
 	  (insert-previous-code)
 	(augment init-code init)
-	(augment steppers step)
-	(prepend (default-driver-code) body)
-	(let ((it-bod `(block ,*block-name*
-			 (tagbody ,@init-code
-			    ,*loop-top*
-			    ,@body
-			    ,@(if *loop-step-used?* (list *loop-step*))
-			    ,@steppers
-			    (go ,*loop-top*)
-			    ,@(if *loop-end-used?* (list *loop-end*))
-			    ,@final-code)
-			 ,(if (member *result-var* *bindings* :key #'car)
-			      *result-var*
-			      nil))))
-	  (wrap-form *loop-body-wrappers*
-		     `(let* ,(nreverse *bindings*)
-			,@(if *declarations*
-			      `((declare ,@*declarations*)))
-			,@decls
-			,(if final-prot 
-			     `(unwind-protect ,it-bod ,@final-prot)
-			     it-bod))))))))
+	(augment steppers step))
+      (prepend (default-driver-code) body)
+      (let ((it-bod `(block ,*block-name*
+		      (tagbody ,@init-code
+			 ,*loop-top*
+			 ,@body
+			 ,@(if *loop-step-used?* (list *loop-step*))
+			 ,@steppers
+			 (go ,*loop-top*)
+			 ,@(if *loop-end-used?* (list *loop-end*))
+			 ,@final-code)
+		      ,(if (member *result-var* *bindings* :key #'car)
+			   *result-var*
+			   nil))))
+	(wrap-form *loop-body-wrappers*
+		   `(let* ,(nreverse *bindings*)
+		     ,@(if *declarations*
+			   `((declare ,@*declarations*)))
+		     ,@decls
+		     ,(if final-prot 
+			  `(unwind-protect ,it-bod ,@final-prot)
+			  it-bod)))))))
 
 (defmacro defmacro-clause (clause-template &body body)
   (define-clause 'defmacro clause-template body nil))
@@ -559,12 +558,15 @@
   ;; This sets *type-alist* to an alist of (var . type), and
   ;; sets *declare-variables* to t if such a declaration was seen.
   (dolist (clause clauses)
-    (when (and (listp clause) (eq (car clause) 'declare))
+    (when (and (consp clause) (eq (car clause) 'declare))
       (dolist (spec (cdr clause))
 	(cond
 	 ((eq (first spec) 'declare-variables)
 	  (setq *declare-variables* t))
 	 ((or (eq (first spec) 'type)  ; We don't do ftypes
+	      ;; FIXME recognize all shorthand type declarations
+	      ;; e.g. (declare ((unsigned-byte 8) x) etc.
+	      ;; -- but how to recognize type specifications?
 	      (member (first spec) standard-type-symbols :test #'eq))
 	  (let ((type (first spec))
 		(vars (cdr spec)))
@@ -610,27 +612,48 @@
 (defun walk (form)
   ;; Returns the usual five things; body is a list of forms.
   (cond
-   ((atom form)
+   ((atom form) ; symbol-macrolet must not expand into Iterate clauses
     (list form))
    ((symbolp (car form))
     (cond
-      ;; the ordering of these checks looks arbitrary, but it is not:
-      ;;
-      ;; macros are expanded first, because implementations are
-      ;; allowed to keep macros as special-operators. to make
-      ;; maintenance of ITERATE easier, I prefer expanded macros over
-      ;; special forms that I have to treat specially. (e.g. clisp
-      ;; tells us that WHEN is a special-operator, and it's perfectly
-      ;; legal, too)
-      ;;
-      ;; after that, special operators need to be expanded before
-      ;; functions; and, by personal preference, special operators
-      ;; should be expanded before iterate clauses.
+     ;; The ordering of these checks is such that:
+     ;; 1. We handle special operators that any Common Lisp code walker
+     ;;    must recognize.
+     ;; 2. We handle some special cases like Allegro's cond
+     ;; 3. Then we expand macros.
+     ;; 4. Then only do we recognize Iterate clauses
+     ;;    -- which may thus be shadowed
+     ;;
+     ;; Note that implementations are permitted to let SPECIAL-OPERATOR-P
+     ;; return T for any macros (e.g. CLISP for WHEN). Yet they must provide
+     ;; a macroexpansion for these.
 
-      ((macro-form? (car form) *env*)
-       (walk (macroexpand form *env*)))
-      ((special-form? (car form))
-       (walk-special-form form))
+     ((special-form? (car form))
+      (walk-special-form form))
+     ((macro-function (car form) *env*)
+      ;; Some compilers (e.g. Lucid on Sparcs) treat macros differently at
+      ;; compile-time; macroexpand does not expand them.  We assume that if
+      ;; this happens, macroexpand's second value is nil.  
+      ;;   What do we do with the form in that case?  This is actually a
+      ;; very serious problem: if we don't walk it, we miss things, but if we
+      ;; do walk it, we don't know how to walk it.  Right now, we don't walk
+      ;; it and print out a warning.
+      ;;  --Jeff Siskind says try binding *macroexpand-hook* to #'funcall.
+      (multiple-value-bind (ex-form expanded?)
+	  (macroexpand form *env*)
+	(cond
+	 (expanded? (walk ex-form))
+	 (t	    (clause-warning "The form ~a is a macro that won't expand. ~
+  It will not be walked, which means that Iterate clauses inside it will ~
+  not be seen."
+				    form)
+		    (list form)))))
+      ((special-operator-p (car form))
+       (clause-warning "The implementation claims that ~a is a special form, but ~
+  Iterate does not know how to handle it. ~
+  It will not be walked, which means that Iterate clauses inside it will ~
+  not be seen." form)
+       (list form))
       ((starts-clause? (symbol-synonym (car form)))
        (process-clause form))     
       (t ;; Lisp function call 
@@ -697,7 +720,7 @@
 
 (defun add-internal-var (var)
   ;; VAR can be a symbol or a list (symbol ...).
-  (cons (if (listp var) (car var) var) *internal-variables*))
+  (cons (if (consp var) (car var) var) *internal-variables*))
 
 (defun add-internal-vars (vars)
   ;; VARS could be a lambda-list, a list of LET bindings, or just a list of
@@ -710,7 +733,7 @@
   (mapcan #'(lambda (thing)
 	      (cond
 	       ((listp thing)
-		(if (listp (car thing)) ; this is a full keyword spec
+		(if (consp (car thing)) ; this is a full keyword spec
 		    (list (second (car thing)))
 		    (list (car thing))))
 	       ((not (member thing lambda-list-keywords))
@@ -724,34 +747,18 @@
 (defun special-form? (symbol)
   ;; special-operator-p doesn't work in Lucid--it returns NIL for let, for
   ;; example.  Plus, we want to catch Iterate special clauses.
-  (or (special-operator-p symbol)
-      (assoc symbol *special-form-alist*)))
-
-(defun macro-form? (symbol &optional env)
-  ;; Workaround to deal with Allegro 7.0 where DECLARE has a
-  ;; MACRO-FUNCTION but MACROEXPANDING it goes into an infinite loop.
-  ;; Arguably this is rightous in any implementation because a DECLARE
-  ;; expression is not a form and MACROEXPAND's argumnet is supposed
-  ;; to be a form.
-  (when (not (eql symbol 'cl:declare))
-    (macro-function symbol env)))
+  (assoc symbol *special-form-alist*))
 
 (defun walk-special-form (form)
-  (let* ((*clause* form)
-	 (func-p (assoc (car form) *special-form-alist*))
-	 (func (cdr func-p)))
-    (declare (optimize (speed 0)))
-    (cond
-      ((null func-p)  ; we don't know anything about the alleged special form
-       (warn "~<Unknown special form ~A. The lisp environment ~
-                claims that ~A is a special operator, but ~
-                ITERATE doesn't know how to handle it.~>"
-	     (car form) (car form))
-       (list form))
-      ((null func)    ; we know about it, but there's nothing to do
-       (list form))
-      (t
-	(apply func form)))))
+  (let ((*clause* form)
+	(func (cdr (assoc (car form) *special-form-alist*))))
+    (if (null func)    ; there's nothing to transform
+	(list form)
+	(apply func form))))
+
+#+nil
+(defun walk-identity (&rest stuff)
+  (list stuff))
 
 (defun walk-cdr (first &rest stuff)
   ;; This is for anything where only the car isn't to be walked.
@@ -792,10 +799,8 @@
     (values (list (cons setq (nreverse body-code)))
 	    decls init-code step-code final-code finalp-code)))
 
-
 (defun walk-function (function form)
-  ;; If form is a lambda expression, walk it.
-  (if (and (listp form) (eq (car form) 'lambda))
+  (if (lambda-expression? form)
       (return-code-modifying-body #'walk-fspec form #L(list 
 						       (list function !1)))
       (list (list function form))))
@@ -808,8 +813,8 @@
   #+ symbolics (setq declaration (copy-list declaration))
   (if (or *top-level?* *binding-context?*)
       (return-code :declarations (list declaration)) 
-      (clause-error "Declarations must occur at top-level, or inside a
-binding context like let or multiple-value-bind.")))
+      (clause-error "Declarations must occur at top-level, or inside a ~
+  binding context like let or multiple-value-bind.")))
 
 (defun walk-if (if test then &optional else)
   (declare (ignore if))
@@ -874,7 +879,7 @@ binding context like let or multiple-value-bind.")))
 
       
 (defun walk-let-binding (binding)
-  (if (listp binding)
+  (if (consp binding)
       (multiple-value-bind (bod decls init step final finalp)
 	  (walk (second binding))
 	(values (list (first binding) (prognify bod)) decls init step final
@@ -906,14 +911,28 @@ binding context like let or multiple-value-bind.")))
   (let ((*top-level?* nil))
     (multiple-value-bind (binds b-decls b-init b-step b-final b-finalp)
 	(walk-list-nconcing bindings #'walk-fspec #L(list !2))
-      (multiple-value-bind (bod decls init step final finalp)
-	  (walk-list body)
-	(return-code :declarations b-decls
-		     :initial (nconc b-init init)
-		     :body (list `(,flet ,binds ,.decls ,.bod))
-		     :step (nconc b-step step)
-		     :final (nconc b-final final)
-		     :final-protected (nconc b-finalp finalp))))))
+      (let ((*binding-context?* t))
+        (multiple-value-bind (bod decls init step final finalp)
+	    (walk-list body)
+	  (return-code :declarations b-decls
+		       :initial (nconc b-init init)
+		       :body (list `(,flet ,binds ,.decls ,.bod))
+		       :step (nconc b-step step)
+		       :final (nconc b-final final)
+		       :final-protected (nconc b-finalp finalp)))))))
+
+(defun walk-locally (first &rest stuff)
+  ;; Set *top-level?* false (via walk-arglist).
+  ;; Note that when *top-level?* is false, walk won't yield declarations
+  ;; because walk-declare errors out since all forms with
+  ;; *declaration-context?* true keep them local (that is, in walk-let,
+  ;; walk-flet and walk-multiple-value-bind b-decls/edecls are always NIL).
+  ;; Ignoring code-movement issues, this approach should be fine.
+  (let* ((forms (member 'declare stuff :key #L(if (consp !1) (car !1))
+			:test-not #'eq))
+	 (decls (ldiff stuff forms)))
+    (return-code-modifying-body #'walk-arglist forms
+				#L(list (cons first (nconc decls !1))))))
 
 
 (defun walk-macrolet (&rest stuff)
@@ -924,18 +943,19 @@ binding context like let or multiple-value-bind.")))
 
 (defun macrolet-error (stuff form-name)
   (declare (ignore stuff))
-  (error "~<~A is not permitted inside Iterate. Please ~
+  (error "~A is not permitted inside Iterate. Please ~
   refactor the iterate form (e.g. by using ~As that wrap ~
-  the ITERATE form).~>" form-name form-name))
+  the ITERATE form)." form-name form-name))
 
-
+#+allegro
 (defun walk-cond (cond &rest stuff)
-  ;; Because allegro compiler insists on treating COND as a special form.
+  ;; Because the allegro compiler insists on treating COND as a special form,
+  ;; and because it macroexpands (cond #) into (cond #)!
   (declare (ignore cond))
   (if (null stuff)
       nil
       (let* ((first-clause (first stuff))
-	     (test (if (not (listp first-clause))
+	     (test (if (not (consp first-clause))
 		       (error "cond clause ~a is not a list" first-clause)
 		       (car first-clause)))
 	     (thens (cdr first-clause))
@@ -972,12 +992,12 @@ binding context like let or multiple-value-bind.")))
 	    (let ((args (cons (keywordize (first ppclause))
 			      (cdr ppclause)))
 		  (func (clause-info-function info)))
-	      (if (macro-form? func *env*)
+	      (if (macro-function func *env*)
 		  (walk (macroexpand (cons func args) *env*))
 		  (apply-clause-function func args))))
 	   (t
 	    (clause-error "No iterate function for this clause; do ~
-               (display-iterate-clauses) to~%see the existing clauses.")))))))
+  (~S) to see the existing clauses." 'display-iterate-clauses)))))))
 
 (defun apply-clause-function (func args)
   (let ((*initial* nil)
@@ -1004,7 +1024,7 @@ binding context like let or multiple-value-bind.")))
     (if (not (symbolp (car cl)))
 	(clause-error "~a should be a symbol" (car cl)))
     (if (null (cdr cl))
-	(clause-error "missing value for ~a keyword" (car cl))))
+	(clause-error "Missing value for ~a keyword" (car cl))))
   (let ((new-clause nil)
 	(syn (symbol-synonym (first clause))))
     (do ((cl (cddr clause) (cddr cl)))
@@ -1027,7 +1047,7 @@ binding context like let or multiple-value-bind.")))
   (if (listp x) x (list x)))
 
 (defun keywordize (symbol)
-  (intern (symbol-name symbol) 'keyword))
+  (intern (symbol-name symbol) :keyword))
 
 );end eval-when
 
@@ -1151,7 +1171,7 @@ binding context like let or multiple-value-bind.")))
       
 
 (defun is-iterate-clause? (form)
-  (and (listp form)
+  (and (consp form)
        (symbolp (car form))
        (starts-clause? (car form))))
 
@@ -1166,7 +1186,7 @@ binding context like let or multiple-value-bind.")))
       (index-lookup symbol *clause-info-index*)
       (eq symbol 'generate)))
 
-;;; The code generated by DEFINE-CLAUSE (below) is the only code that the
+;;; The code generated by DEFINE-CLAUSE (below) is the only code that
 ;;; invokes this.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -1227,7 +1247,7 @@ binding context like let or multiple-value-bind.")))
       `(:index (,(car keywords) . ,(build-index (cdr keywords) info)))))
 		 
 (defun index? (x)
-  (and (listp x) (eq (car x) :index)))
+  (and (consp x) (eq (car x) :index)))
 
 (defun index-add (key thing index)
   (push (cons key thing) (cdr index)))
@@ -1251,8 +1271,8 @@ binding context like let or multiple-value-bind.")))
 	    (kw2 (clause-info-keywords ci2)))
 	(if (= insert-n 2)
 	    (rotatef kw1 kw2))
-	(error "Iterate: Inserting clause ~a would create
-an ambiguity with clause ~a" 
+	(error "Iterate: Inserting clause ~a would create ~
+  an ambiguity with clause ~a"
 	       kw1 kw2))))
 
 
@@ -1288,15 +1308,15 @@ an ambiguity with clause ~a"
  (let* ((all-keywords (mapcar #L(if (eq !1 '&optional) !1 (keywordize !1))
 			      clause-keywords))
 	(req-keywords (cons (car clause-keywords)
-			    (cdr (ldiff all-keywords (member `&optional
+			    (cdr (ldiff all-keywords (member '&optional
 							     all-keywords))))))
    (labels ((remove-clause-internal (keywords index)
 	      (if (null keywords)
-		  (error "clause ~a not found" clause-keywords)
+		  (error "Clause ~a not found" clause-keywords)
 		  (let ((entry (index-lookup (car keywords) index)))
 		    (cond
 		     ((null entry)
-		      (error "clause ~a not found" clause-keywords))
+		      (error "Clause ~a not found" clause-keywords))
 		     ((clause-info-p (cdr entry))
 		      (if (equal all-keywords 
 				 (clause-info-keywords (cdr entry)))
@@ -1327,7 +1347,7 @@ an ambiguity with clause ~a"
 ;    (define-clause 'defun clause-template for-body)
 ;    (define-clause 'defun gen-clause-template gen-body)))
 
-(eval-when (:compile-toplevel :load-toplevel)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defconst sequence-keyword-list
     '(:FROM from :UPFROM upfrom :DOWNFROM downfrom :TO to :DOWNTO downto
       :ABOVE above :BELOW below :BY (by 1) :WITH-INDEX with-index))
@@ -1441,7 +1461,7 @@ an ambiguity with clause ~a"
       (push (cadr lis) evens)))
 
   (defun contains-duplicates? (list)
-    (not (equal list (remove-duplicates list))))
+    (not (equal list (remove-duplicates list :test #'eq))))
 
   )					; end eval-when
 
@@ -1497,7 +1517,7 @@ an ambiguity with clause ~a"
   ;; loop, ELSE subsequent times; 2: the variable that keeps track of
   ;; the first time.
   (let* ((var (or first-time-var 
-		  (make-var-and-binding 'first-time t :type 'symbol)))
+		  (make-var-and-binding 'first-time t :type 'boolean)))
 	 (code (if else
 		   `(cond
 		     (,var
@@ -1571,24 +1591,24 @@ an ambiguity with clause ~a"
 
 (defun quoted? (x)
   ;; Returns T iff x is of the form (quote ...)
-  (and (listp x) (eq (car x) 'quote)))
+  (and (consp x) (eq (car x) 'quote)))
 
 (defun function-quoted? (x)
   ;; Returns T iff x is of the form (function ...) [same as #'(...)]
-  (and (listp x) (eq (car x) 'function)))
+  (and (consp x) (eq (car x) 'function)))
 
 (defun lambda-expression? (x)
-  (and (listp x) (eq (car x) 'lambda)))
+  (and (consp x) (eq (car x) 'lambda)))
 
 (defun the-expression? (x)
-  (and (listp x) (eq (first x) 'the)))
+  (and (consp x) (eq (first x) 'the)))
 
 (defun self-evaluating? (x)
-  ;; See CLM, Sec. 5.1.1.
+  ;; Everything but symbols and lists are self-evaluating since CLtL2.
   ;; This differs from constantp in that it returns nil for quoted
   ;; things and defconstants.
-  (or (null x) (numberp x) (characterp x) (stringp x) 
-      (bit-vector-p x) (keywordp x)))
+  ;; (typep x '(and atom (or (not symbol) keyword (member t nil))))
+  (and (atom x) (or (null x) (not (symbolp x)) (eq x t) (keywordp x))))
 
 (defun constant? (x)
   ;; This differs from constantp in that it doesn't acknowledge
@@ -1596,8 +1616,7 @@ an ambiguity with clause ~a"
   ;; them is that the run-time and compile-time environments may
   ;; differ.  The things constant? returns T for are really and truly
   ;; constant everywhere.
-  (or (self-evaluating? x) (quoted? x) (function-quoted? x)
-      (eq x t)))
+  (or (self-evaluating? x) (quoted? x) (function-quoted? x)))
 
 (defun duplicable? (x)
   ;; Returns T if X can be copied in code.  This returns T for symbols, on the
@@ -1694,14 +1713,14 @@ an ambiguity with clause ~a"
       entry)
      ((and kind (second entry) (not (eq (second entry) kind)))
       (clause-error "Attempt to do ~a accumulation into a variable ~
-                     already being used~%for ~a accumulation."
+  already being used for ~a accumulation."
 		    kind (second entry)))
      (t
       (if value-supplied?
 	  (let ((orig-value  (second (assoc var *bindings*))))
 	    (if (not (equal value orig-value))
 		(clause-error "Initial values ~a and ~a are not equal ~
-for variable ~a" 
+  for variable ~a"
 			      orig-value value var))))
       (check-internal-variables var)
       entry))))
@@ -1721,11 +1740,12 @@ for variable ~a"
   ;; and using-type-of.)  If neither is supplied, we DO NOT try to
   ;; infer the type of value--we just give up.  Otherwise, someone who
   ;; innocently did (make-binding 'foo nil) would discover that the
-  ;; resulting code, if iterate-declare-variables was used, would 
+  ;; resulting code, if declare-variables was used, would 
   ;; have foo declared to be of type symbol (since, in Lucid at least,
   ;; (type-of nil) == symbol).  Note that we do not check for a type
   ;; conflict between a supplied type and the existing type; the
   ;; existing type just wins.
+  ;;
   ;;   The var can actually be of the form (the <type> var).
   (let ((var (extract-var var-spec)))
     (cond
@@ -1752,7 +1772,6 @@ for variable ~a"
       t)))))
 
 
-
 (defun make-initial-value (value value-supplied? type)
   ;; This should really be done by trying to coerce, then trapping the error,
   ;; because the subtype checks aren't really right--nil, for instance, is a
@@ -1773,7 +1792,7 @@ for variable ~a"
 	(subtypep type 'sequence) (subtypep type 'symbol))
     (coerce nil type))
    ((subtypep type 'character)
-    (coerce #\null type))
+    (coerce (code-char 0) type)) ; Neither #\Null nor #\Nul are valid characters.
    (t 
     (clause-warning 
      "Cannot supply an initial value for type ~a; using NIL."
@@ -1791,9 +1810,9 @@ for variable ~a"
 (defun check-internal-variables (var)
   (if (internal-variable? var)
       (clause-error 
-       "The variable ~a, which iterate would like to bind, already has a
-binding in a context internal to the iterate form.  Give the variable
-another name." var)))
+       "The variable ~a, which Iterate would like to bind, already has a ~
+  binding in a context internal to the iterate form.  Give the variable ~
+  another name." var)))
 
 (defun internal-variable? (var)
   (member var *internal-variables* :test #'eq))
@@ -1819,6 +1838,7 @@ another name." var)))
 ;;;  FOR...IN-FILE (setq)
 ;;;  FOR...IN-STREAM (setq)
 ;;;  FOR...IN-HASHTABLE (setq)
+;;;  FOR...IN-PACKAGE (setq)
 ;;;  element-var of sequence & list drivers (setq)
 
 
@@ -1829,11 +1849,11 @@ another name." var)))
     (clause-error "Can't bind to NIL: ~a" value))
    ((var-spec? template)
     (make-binding template value :type type :using-type-of using-type-of))
-   ((not (listp template))
+   ((not (consp template))
     (clause-error "Invalid binding form: ~a" template))
    ((eq (car template) 'values)
     (clause-error "Cannot perform multiple-value destructuring in ~
-                   this context"))
+    this context"))
    (t
     (let ((var (make-var-and-binding 'temp value)))
       (push var *temps*)  ; so that others can benefit
@@ -1847,7 +1867,7 @@ another name." var)))
    ((var-spec? template)
     (make-binding template value)
     nil)
-   ((not (listp template))
+   ((not (consp template))
     (clause-error "Invalid binding form: ~a" template))
    ((eq (car template) 'values)
     (clause-error "Multiple-value destructuring cannot be nested"))
@@ -1863,7 +1883,7 @@ another name." var)))
     nil)
    ((var-spec? template)
     (list (extract-var template)))
-   ((not (listp template))
+   ((not (consp template))
     (clause-error "Invalid binding form: ~a" template))
    ((eq (car template) 'values)
     (mapcan #'extract-vars (cdr template)))
@@ -1889,7 +1909,7 @@ another name." var)))
     (if bindings?
 	(make-default-binding template :type type))
     `(setq ,template ,value))
-   ((and (listp template) (eq (car template) 'values))
+   ((and (consp template) (eq (car template) 'values))
     ;; Just do a simple check for the most common errors.  There's no way we
     ;; can catch all problems.
     (if (or (atom value) (member (car value) '(car cdr cdar caar aref get)))
@@ -1910,7 +1930,7 @@ another name." var)))
     (if bindings?
 	(make-default-binding template))
     `((setq ,(extract-var template) ,value)))
-   ((not (listp template))
+   ((not (consp template))
     (dsetq-error "Invalid binding form: ~a" template))
    ((eq (car template) 'values)
     (error "Multiple-value destructuring cannot be nested"))
@@ -1919,18 +1939,17 @@ another name." var)))
 	   (make-dsetqs (cdr template) `(cdr ,value) bindings?)))))
 
 (defun make-mv-dsetqs (templates value bindings?)
-  (let ((temps nil)
-	(vars nil)
-	(tplates nil))
+  (let ((temps '()) (vars '()) (tplates '()))
+    (declare (type list temps vars tplates))
     (dolist (tp templates)
       (cond
-       ((var-spec? tp)
+       ((and tp (var-spec? tp)) ; either var or (the type var)
 	(push nil tplates)
 	(push nil temps)
 	(push (extract-var tp) vars)
 	(if bindings?
 	    (make-default-binding tp)))
-       (t
+       (t ; either NIL or destructuring template
 	(let ((temp (gensym)))
 	  (push tp tplates)
 	  (push temp temps)
@@ -1938,10 +1957,12 @@ another name." var)))
     (setq temps (nreverse temps))
     (setq vars (nreverse vars))
     (setq tplates (nreverse tplates))
-    (let ((mv-setq `(multiple-value-setq ,vars ,value)))
-      (if (every #'null temps)
+    (let ((mv-setq `(multiple-value-setq ,vars ,value))
+	  (temp-vars (delete nil temps)))
+      (if (null temp-vars)
 	  mv-setq
-	  `(let ,(delete nil temps)
+	  `(let ,temp-vars
+	     (declare (ignorable .,temp-vars)) ; in case of NIL template
 	     ,mv-setq
 	     ,.(mapcan #L(make-dsetqs !1 !2 bindings?)
 		       tplates temps)
@@ -1963,9 +1984,9 @@ another name." var)))
     (if vars
 	(let ((len (length vars)))
 	  (clause-error "The variable~p ~a ~a bound in a context internal to ~
-the Iterate form.
-This part of the clause will be moved outside the body of the loop, so it
-must not contain anything that depends on the body."
+  the Iterate form.~%
+  This part of the clause will be moved outside the body of the loop, so it ~
+  must not contain anything that depends on the body."
 			len (if (= len 1) (car vars) vars)
 			(if (= len 1) "is" "are"))))))
 
@@ -2010,9 +2031,9 @@ must not contain anything that depends on the body."
 	(let
 	    (let* ((bindings (second form))
 		   (body (cddr form))
-		   (vars (mapcar #L(if (listp !1) (car !1) !1)
+		   (vars (mapcar #L(if (consp !1) (car !1) !1)
 				 bindings)))
-	      (nconc (mapcan #L(if (listp !1)
+	      (nconc (mapcan #L(if (consp !1)
 				   (free-vars (second !1) bound-vars)
 				   nil)
 			     bindings)
@@ -2022,18 +2043,18 @@ must not contain anything that depends on the body."
 		   (body (cddr form))
 		   (free-vars nil))
 	      (dolist (binding bindings)
-		(if (listp binding)
+		(if (consp binding)
 		    (augment free-vars (free-vars (second binding) 
 						  bound-vars)))
-		(push (if (listp binding) (car binding) binding) bound-vars))
+		(push (if (consp binding) (car binding) binding) bound-vars))
 	      (nconc free-vars (free-vars-list body bound-vars))))
 	(otherwise
 	    nil)))
-     ((macro-form? (car form) *env*)
+     ((macro-function (car form) *env*)
       (free-vars (macroexpand form *env*) bound-vars))
      (t ; function call
       (free-vars-list (cdr form) bound-vars))))
-   ((and (listp (car form)) (eq (caar form) 'lambda))
+   ((and (consp (car form)) (eq (caar form) 'lambda))
     (nconc (free-vars-fspec (car form) bound-vars)
 	   (free-vars-list (cdr form) bound-vars)))
    (t
@@ -2133,7 +2154,8 @@ must not contain anything that depends on the body."
 			 (cond
 			  ((or from upfrom downfrom)
 			   `(,other-func ,(or from upfrom downfrom) ,step))
-			  ((or downto above) size-code)
+			  ((or downto above)
+			   (if (eql step 1) size-code `(+ ,size-code (1- ,step))))
 			  (t `(- ,step)))))
 	 (access-code (if (null access-fn)
 			  nil
@@ -2174,7 +2196,7 @@ must not contain anything that depends on the body."
 (defun eval-const-expr (expr)
   ;; This is very simple: if expr is a list, and all the args are constants,
   ;; it will evaluate it; else it will just return it.
-  (if (and (listp expr) (every #'constantp (cdr expr)))
+  (if (and (consp expr) (every #'constantp (cdr expr)))
       (eval expr)
       expr))
 
@@ -2199,7 +2221,7 @@ must not contain anything that depends on the body."
     `(,fn ,@args))
    ((function-quoted? fn)
     `(,(second fn) ,@args))
-   ((and (listp fn) (eq (car fn) 'subst))
+   ((and (consp fn) (eq (car fn) 'subst))
     (apply-subst-expr fn args))
    ((functionp fn) `(funcall ,fn ,@args)) ;; Siskind's patch for compiled fns
    (t
@@ -2247,10 +2269,11 @@ must not contain anything that depends on the body."
  
 (def-special-clause ELSE (&rest forms)
   "Lisp forms to execute if the loop is never entered"
-  (let ((flag (make-var-and-binding 'else t :type 'symbol)))
+  (mapc #'local-binding-check forms)
+  (let ((flag (make-var-and-binding 'else t :type 'boolean)))
     (return-code :final `((when ,flag
 			    ,@(walk-list forms)))
-                 :body (list `(setf ,flag nil)))))
+                 :body (list `(setq ,flag nil)))))
 
 (def-special-clause FINALLY (&rest forms)
   "Lisp forms to execute after loop ends"
@@ -2288,28 +2311,27 @@ must not contain anything that depends on the body."
 	       (code (copy-list (driver-info-next-code di))))
 	  (if (internal-variable? var)
 	      (clause-error "The variable ~a is bound in a context internal ~
-to the Iterate form. 
-It cannot be stepped at this point in the code." var))
+  to the Iterate form. ~
+  It cannot be stepped at this point in the code." var))
 	  (if (some #'internal-variable? vars)
-	      (clause-error "Some of the variables ~a, which will be stepped
-when this clause is executed, are bound in a context internal to the Iterate
-form, so ~a cannot be stepped at this point in the code." vars var))
+	      (clause-error "Some of the variables ~a, which will be stepped ~
+  when this clause is executed, are bound in a context internal to the Iterate ~
+  form, so ~a cannot be stepped at this point in the code." vars var))
 	  (setf (driver-info-used di) t)
 	  (register-previous-code vars code :next)
 	  (return-code :body (make-next-code var code n))))))
 
 
 (defun make-next-code (var code n)
-  ;; Construct the body carefully, ensuring that CODE, and not a copy,
-  ;; appears in it.
+  ;; Construct the body carefully (avoid backquote), ensuring that CODE,
+  ;; and not a copy, appears in it.
   (let ((var-code (if (eq var (var-value-returned code))
 		      nil
 		      (list var))))
     (if (eql n 1)
 	(list (cons 'progn (nconc code var-code)))
 	(let ((i (genvar 'next)))
-	  (list (cons 'progn (cons 'dotimes (cons (list i n var) 
-						  code))))))))
+	  (list (list* 'dotimes (list i n var) `(declare (ignore ,i)) code))))))
 
 
 (defun var-value-returned (forms)
@@ -2441,7 +2463,7 @@ form, so ~a cannot be stepped at this point in the code." vars var))
 
 
 (defclause-sequence IN-VECTOR INDEX-OF-VECTOR
-  ;; This doesn't observe fill-pointers.
+  ;; This observes fill-pointers.
   :access-fn 'aref
   :size-fn 'length
   :sequence-type 'vector
@@ -2464,48 +2486,48 @@ form, so ~a cannot be stepped at this point in the code." vars var))
   :element-doc-string "Characters in a string"
   :index-doc-string "Indices of a string")
 
-(defmacro-clause (FOR key-val-vars IN-HASHTABLE table)
-  "Elements of a hashtable"
-  ;; This is just like FOR...IN.
+;;;FIXME 2004-11-11 destructure only after termination test
+(defclause-driver (FOR key-val-vars IN-HASHTABLE table)
+  "Elements and keys of a hashtable"
   (top-level-check)
-  (if (not (listp key-val-vars))
-      (clause-error "~a should be a list of two variables: the first for the
-keys, the second for the values." key-val-vars))
-  (let* ((iterator (gensym))
-	 (more? (gensym)))
-    (destructuring-bind (&optional (key (gensym)) (item (gensym))) key-val-vars
-      (setq *loop-end-used?* t)
-      (add-loop-body-wrapper `(with-hash-table-iterator (,iterator ,table)))
-      `(progn
-	 (for (values ,more? ,key ,item) = (,iterator))
-	 (declare (ignorable ,key ,item))
-	 (while ,more?)))))
+  (unless (consp key-val-vars)
+    (clause-error "~a should be a list of up to two variables: the first ~
+  for the keys, the second for the values." key-val-vars))
+  (let* ((iterator (gensym "HASH-TABLE-ITERATOR-"))
+	 (more?    (gensym))
+	 (var-spec `(values ,more? .,key-val-vars))
+	 (setqs    (do-dsetq var-spec `(,iterator)))
+	 (test     `(if (not ,more?) (go ,*loop-end*))))
+    (setq *loop-end-used?* t)
+    (add-loop-body-wrapper `(with-hash-table-iterator (,iterator ,table)))
+    (return-driver-code :next (list setqs test)
+			:variable var-spec)))
 
-(defmacro-clause (FOR sym-access-pkg-vars IN-PACKAGES pkgs &optional HAVING-ACCESS (sym-types '(:external :internal :inherited)))
-  "Symbols in packages"
+(defclause-driver (FOR sym-access-pkg-vars IN-PACKAGES pkgs &optional HAVING-ACCESS (sym-types '(:external :internal :inherited)))
+  "Symbols and their access-types in packages"
+  ;;defclause-driver has the benefit over defmacro-driver of less code walking
   (top-level-check)
-  (if (not (listp sym-access-pkg-vars))
-      (clause-error "~s should be a list of up to three variables: the symbol, ~
-the access type and the home package." sym-access-pkg-vars))
-  (if (not (listp sym-types))
-      (clause-error "~s should be a list of symbols indicating the symbols' ~
-access types." sym-types))
-  (let* ((iterator (gensym))
-	 (more? (gensym)))
-    (destructuring-bind (&optional (symbol (gensym)) (access (gensym)) (pkg (gensym))) sym-access-pkg-vars
-      (setq *loop-end-used?* t)
-      (add-loop-body-wrapper `(with-package-iterator (,iterator ',pkgs ,@sym-types)))
-      `(progn
-	 (for (values ,more? ,symbol ,access ,pkg) = (,iterator))
-	 (declare (ignorable ,symbol ,access ,pkg))
-	 (while ,more?)))))
+  (unless (and (listp sym-access-pkg-vars) ; empty list is allowed (count)
+	       (every #'symbolp sym-access-pkg-vars))
+    (clause-error "~s should be a list of up to three variables: the symbol, ~
+  the access type and the home package." sym-access-pkg-vars))
+  (unless (consp sym-types)
+    (clause-error "~s should be a list of symbols indicating the symbols' ~
+  access types." sym-types))
+  (let* ((iterator (gensym "PACKAGE-ITERATOR-"))
+	 (more?    (gensym))
+	 (var-spec `(values ,more? .,sym-access-pkg-vars))
+	 (setqs    (do-dsetq var-spec `(,iterator)))
+	 (test     `(if (not ,more?) (go ,*loop-end*))))
+    (setq *loop-end-used?* t)
+    (add-loop-body-wrapper `(with-package-iterator (,iterator ,pkgs .,sym-types)))
+    (return-driver-code :next (list setqs test)
+			:variable var-spec)))
 
-
-(defmacro-clause (FOR var IN-PACKAGE pkg &optional EXTERNAL-ONLY (ext nil))
-  "Symbols in a package (deprecated)"
-  `(FOR (,var) IN-PACKAGES ,pkg HAVING-ACCESS ,(if ext
-						   '(:external)
-						   '(:external :internal :inherited))))
+(defmacro-driver (FOR var IN-PACKAGE pkg &optional EXTERNAL-ONLY (ext nil))
+  "Symbols accessible in a package"
+  `(,(if generate 'generate 'FOR) (,var) IN-PACKAGES ,pkg HAVING-ACCESS
+	 ,(if ext '(:external) '(:external :internal :inherited))))
 
 (defclause-driver (FOR var IN-FILE filename &optional USING (reader '#'read))
   "Forms in a file"
@@ -2527,7 +2549,7 @@ access types." sym-types))
 		      ;; We can use the given variable directly if no
 		      ;; destructuring is required, and if the type of the
 		      ;; variable can hold a symbol (since we use a gensym for
-		      ;; the eof-marker). 
+		      ;; the eof-marker).
 		      evar
 		      (genvar 'temp)))
 	 (eof (gensym))
@@ -2561,15 +2583,9 @@ access types." sym-types))
 			  :final final
 			  :final-protected finalp))))
   
-;;; FIXME 2004-02-18/asf:
-;;; (iterate (initially (setq i 0))
-;;;	       (for i do-next (if (> i 10) (terminate) (incf i))))
-;;; doesn't initially bind I, but
-;;; (iterate (initially (setq i 0))
-;;;	       (for i next (if (> i 10) (terminate) (1+ i))))
-;;; does.
 (defclause-driver (FOR var DO-NEXT next)
-  "General driver; VAR must be explicitly set"
+  "General driver; VAR must be set in NEXT"
+    (do-dsetq var '(list)) ; for effect only, to make var known
     (multiple-value-bind (body decls init step final finalp)
 	(mapcan #'walk (if (list-of-forms? next)
 			   (copy-list next)
@@ -2697,7 +2713,7 @@ access types." sym-types))
 (defclause (COUNTING expr &optional INTO var)
   "Increment a variable if expression is non-nil"
   (return-reduction-code :identity 0
-			 :operation '(subst (var exp) (1+ var))
+			 :operation '(subst (var expr) (1+ var))
 			 :expression nil
 			 :test expr
 			 :variable var
@@ -2843,12 +2859,15 @@ access types." sym-types))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Aggregated Boolean tests.
 
+;; Use same :if-exists kind of accumulation as finding ... such-that
+;; so the clauses can be used together.
+
 (defclause (ALWAYS expr)
   "Return last value iff expression is always non-nil"
   ;; VALUE: expr
   (setq expr (walk-expr expr))
   (let ((var *result-var*))
-    (make-accum-var-binding var t :Boolean)
+    (make-accum-var-binding var t :if-exists)
     (return-code :body `((or (setq ,var ,expr) 
 			     (return-from ,*block-name* nil))))))
 
@@ -2858,7 +2877,8 @@ access types." sym-types))
   ;; VALUE: expr (which is always nil)
   (setq expr (walk-expr expr))
   (let ((var *result-var*))
-    (make-accum-var-binding var t :Boolean :type 'symbol)
+    ;; Do not use :type 'symbol so as be compatible with ALWAYS
+    (make-accum-var-binding var t :if-exists)
     (return-code :body `((if ,expr (return-from ,*block-name* nil))))))
 
 
@@ -2868,7 +2888,7 @@ access types." sym-types))
   ;; VALUE: expr (which is always nil)
   (setq expr (walk-expr expr))
   (let ((var *result-var*))
-    (make-accum-var-default-binding var :Boolean)
+    (make-accum-var-default-binding var :if-exists)
     (return-code :body `((if (setq ,var ,expr) 
 			     (return-from ,*block-name* ,var))))))
 
@@ -2885,7 +2905,7 @@ access types." sym-types))
   (setq var-spec (or var-spec *result-var*))
   (setq *loop-end-used?* t)
   (let ((var (extract-var var-spec)))
-    (make-binding var-spec fval :using-type-of fval) 
+    (make-accum-var-binding var-spec fval :if-exists :using-type-of fval) 
     (if (function-quoted? test)
 	(if (duplicable? expr)
 	    (return-code :body `((when ,(make-funcall test expr)
@@ -2949,13 +2969,13 @@ access types." sym-types))
       ;; a single var-spec means set expr to that var
       (setq expr-var var)
       (setq m-var (genvar kind)))
-     ((and (listp var) (= (length var) 2) (every #'var-spec? var))
+     ((and (consp var) (= (length var) 2) (every #'var-spec? var))
       ;; a two-element list means set expr to 1st, m to 2nd
       (setq expr-var (first var))
       (setq m-var (second var)))
      (t
-      (clause-error "The value for INTO, ~a, should be a variable specifier~%~
-                     or a list of two variable specifiers." var)))
+      (clause-error "The value for INTO, ~a, should be a variable specifier ~
+  or a list of two variable specifiers." var)))
     (make-default-binding expr-var :using-type-of expr)
     (make-accum-var-default-binding m-var kind :using-type-of m-expr)
     (setq expr-var (extract-var expr-var))
@@ -2985,19 +3005,20 @@ access types." sym-types))
 				    start-operation end-operation
 				    one-element
 				    test
-				    (place 'end) (result-type 'list)
-				    &aux place-string)
+				    (place 'end) (result-type 'list))
   ;; VALUE: the list so far.
-  (setq place-string (symbol-name place))
-  (cond
-   ((string= place-string "END")
-    (setq place 'end))
-   ((or (string= place-string "START")
-	(string= place-string "BEGINNING"))
-    (setq place 'start))
-   (t 
-    (clause-error "~a is neither 'start', 'beginning' or 'end'" 
-		  place)))
+  ;; Remove the "maybe quoted" idiom from documentation & code in the next release
+  (when (quoted? result-type) (setq result-type (second result-type)))
+  (when (quoted? place) (setq place (second place)))
+  (let ((place-string (locally (declare (optimize safety)) (symbol-name place))))
+    (cond
+     ((string= place-string '#:end)
+      (setq place 'end))
+     ((or (string= place-string '#:start)
+	  (string= place-string '#:beginning))
+      (setq place 'start))
+     (t 
+      (clause-error "~a is neither 'start', 'beginning' nor 'end'" place))))
   (let* ((collect-var-spec (or variable *result-var*))
 	 (collect-var (extract-var collect-var-spec))
 	 (entry (make-accum-var-binding collect-var-spec nil 
@@ -3066,7 +3087,7 @@ access types." sym-types))
    :start-operation 'cons 
    :end-operation '(subst (var expr) (list expr))
    :place place
-   :result-type (if (quoted? type) (second type) type)))
+   :result-type type))
 
 (defsynonym collecting collect)
 
@@ -3082,7 +3103,7 @@ access types." sym-types))
        :test `(subst (var expr) (not (member expr var :test ,test)))
        :end-operation '(subst (var expr) (list expr))
        :one-element t
-       :result-type (if (quoted? type) (second type) type)
+       :result-type type
        :place place)
       (with-temporary temp
 	(return-collection-code
@@ -3095,7 +3116,7 @@ access types." sym-types))
 		   (not (member ,temp var :test ,test))))
 	 :end-operation `(subst (var expr) (list ,temp))
 	 :one-element t
-	 :result-type (if (quoted? type) (second type) type)
+	 :result-type type
 	 :place place))))
 
 
@@ -3450,7 +3471,7 @@ access types." sym-types))
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (when *old-sharpl-func*
+  (when (and (boundp '*old-sharpL-func*) *old-sharpL-func*)
     (set-dispatch-macro-character #\# #\L *old-sharpL-func*)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

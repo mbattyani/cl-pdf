@@ -36,6 +36,7 @@
 	       (:file "pdf" :depends-on ("font"))
 	       (:file "x11-colors" :depends-on ("defpackage"))
 	       (:file "pdf-base" :depends-on ("pdf" "x11-colors"))
+	       (:file "png" :depends-on ("pdf-base"))
 	       (:file "pdf-geom" :depends-on ("pdf-base"))
 	       (:file "text" :depends-on ("pdf-base"))
 	       (:file "bar-codes" :depends-on ("pdf-geom"))

@@ -409,7 +409,7 @@
 	  (move-to x 0)
 	  (line-to x l)
 	  (stroke)
-	  (draw-centered-text text-x text-y (format nil format value) (label-font axis) font-size))))
+	  (draw-centered-text text-x text-y (format nil format value) (label-font axis) font-size d))))
 
 (defclass plot-xy ()
   ((x :accessor x :initform 0 :initarg :x)

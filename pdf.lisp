@@ -1,4 +1,4 @@
-;;; cl-pdf copyright 2002-2003 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -62,7 +62,8 @@
    (subject :accessor subject :initarg :subject :initform nil)))
 
 (defmethod initialize-instance :after ((doc document) &rest init-options
-				       &key (creator "cl-pdf") empty author title subject keywords
+				       &key (creator "")
+				       empty author title subject keywords
 				       &allow-other-keys)
   (declare (ignore init-options))
   (unless empty
@@ -78,7 +79,7 @@
 					  ("/Pages" . ,(root-page doc)))))
       (setf (content (docinfo doc))
             (make-instance 'dictionary
-                           :dict-values `(("/Creator" . ,(format nil "~a (cl-pdf ~A)" creator *version*))
+                           :dict-values `(("/Creator" . ,(format nil "(cl-pdf ~A - ~A)" *version* creator))
                                           ,@(when author `(("/Author" . ,(format nil "(~A)" author))))
                                           ,@(when title `(("/Title" . ,(format nil "(~A)" title))))
                                           ,@(when subject `(("/Subject" . ,(format nil "(~A)" subject))))
@@ -236,11 +237,29 @@
     (compute-outline-tree (list (outline-root document)))
     (add-dict-value (content (catalog document)) "/Outlines" (outline-root document))))
 
+(defun pdf-name (obj &optional (prefix #\/))
+;; Helper (akin to pdf-string) to escape non-alphanumeric characters in PDF names
+;; by writing 2-digit hexadecimal code, preceded by the number sign character (#).
+;; CAUTION: PDF names are case-sensitive!
+  (let ((string (if (stringp obj)
+                    (if (and prefix (char= (schar obj 0) prefix))
+                        (return-from pdf-name obj) ; PDF-ready
+                        obj)
+                    (princ-to-string obj))))
+    (with-output-to-string (stream nil #-cmu :element-type #-cmu (array-element-type string))
+      (when prefix
+        (write-char prefix stream))
+      (dotimes (i (length string))
+        (let ((char (schar string i)))
+          (if (or (alphanumericp char)
+                  (find char "-_." :test #'char=)) ; often used regular chars
+              (write-char char stream)
+              (format stream "#~2,'0x" (char-code char))))))))
+
 (defmacro enforce-/ (&rest names)
-  `(progn
-    ,@(loop for name in names
-	    collect `(unless (char= (schar ,name 0) #\/)
-		      (setf ,name (concatenate 'string "/" ,name))))))
+;;; Verify and prefix each name by / unless it is PDF-ready.
+  `(setf ,@(loop for name in names collect name collect `(pdf-name ,name))))
+
 (defun add-/ (name)
   (concatenate 'string "/" name))
  
@@ -313,19 +332,27 @@
    (height :accessor height :initarg :height)))
 
 (defmethod initialize-instance :after ((image image) &rest init-options &key
-				       bits width height (filter "ASCIIHexDecode")
+				       bits width height 
+                                       (filter "ASCIIHexDecode") decode-parms
 				       (color-space "DeviceRGB")(bits-per-color 8)
+                                       mask decode
 				       no-compression
 				       &allow-other-keys)
-  (enforce-/ filter color-space)
+ ;;; Args: color-space - can be an array!
+  (enforce-/ filter) ; color-space)
   (setf (content image)
 	(make-instance 'pdf-stream
 	       :no-compression no-compression
 	       :dict-values `(("/Type" . "/XObject")("/Subtype" . "/Image")
 			      ("/Width" . ,width)("/Height" . ,height)
 			      ("/Filter" . ,filter)
+                              ,@(when decode-parms `(("/DecodeParms" . 
+                                                      ,(make-instance 'dictionary
+                                                         :dict-values decode-parms))))
 			      ("/ColorSpace" . ,color-space)
-			      ("/BitsPerComponent" . ,bits-per-color))))
+			      ("/BitsPerComponent" . ,bits-per-color)
+                              ,@(when decode `(("/Decode" . ,decode)))
+                              ,@(when mask `(("/Mask" . ,mask))) )))
   (setf (content (content image)) bits))
 
 (defun add-images-to-page (&rest images)
