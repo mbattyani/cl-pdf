@@ -4,6 +4,8 @@
 
 (in-package pdf)
 
+(defvar *default-encoding* :win-ansi-encoding)
+
 (defvar *encodings* (make-hash-table :test #'equal))
 
 (defclass encoding ()

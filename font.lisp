@@ -106,7 +106,7 @@
 			     (force-char-code char2))(kernings font) 0)))
     (if font-size (* font-size kerning) kerning)))
 
-(defun get-font (&optional (name "helvetica") (encoding :win-ansi-encoding))
+(defun get-font (&optional (name "helvetica") (encoding *default-encoding*))
   (setf name (string-downcase name))
   (let ((font (gethash (list name (get-encoding encoding)) *font-cache*)))
     (if font
