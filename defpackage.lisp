@@ -1,6 +1,6 @@
 (in-package cl-user)
 
-;;; cl-pdf copyright 2002 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2003 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -35,6 +35,7 @@
    #:draw-centered-text #:draw-left-text #:draw-right-text
    #:vertical-value-axis #:horizontal-histo-axis #:legend #:histogram #:draw-object
    #:pie-chart #:plot-xy
-   #:load-t1-font #:encoding #:get-encoding 
+   #:load-t1-font #:encoding #:get-encoding
+   #:draw-bar-code128
 ))
 
