@@ -1,0 +1,13 @@
+
+If you have some time and want to contribute, here are some things needed by cl-pdf.
+This list is not exhaustive
+
+Charts improvements:
+       more chart types
+       more options (3D ?)
+       correct sizing model
+
+Higher level graphical functions.
+
+Syntax converters (SVG, VML, ?)
+
