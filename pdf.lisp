@@ -232,7 +232,7 @@
 	  (make-instance 'dictionary
              :dict-values `(("/Type" . "/Font")
 			    ("/Subtype" . ,(add-/ (font-type font-metrics)))
-			    ("/BaseFont" . ,(add-/ (name font)))
+			    ("/BaseFont" . ,(add-/ (font-name (font-metrics font))))
 			    ,@(when font-descriptor `(("/FirstChar" . 0)))
 			    ,@(when font-descriptor `(("/LastChar" . 255)))
 			    ,@(when font-descriptor `(("/Widths" . ,(pdf-widths font))))
@@ -432,6 +432,9 @@
    (with-open-file (s filename :direction :output :if-exists :supersede
 		      :external-format +external-format+)
      (write-document s document)))
+
+(defmethod write-document ((filename string) &optional (document *document*))
+  (write-document (pathname string) document))
 
 (defmacro with-document ((&rest args) &body body)
   `(let* ((*document* (make-instance 'document ,@args))

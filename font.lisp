@@ -13,7 +13,7 @@
 (defvar *font-cache* (make-hash-table :test #'equal))
 
 (defclass font ()
- ((name :accessor name :initform "Helvetica" :initarg :name)
+ ((name :accessor name :initform "helvetica" :initarg :name)
   (encoding :accessor encoding :initform *standard-encoding*)
   (hyphen-code :accessor hyphen-code :initform 0)
   (hyphen-char :accessor hyphen-char :initform nil)
@@ -106,7 +106,8 @@
 			     (force-char-code char2))(kernings font) 0)))
     (if font-size (* font-size kerning) kerning)))
 
-(defun get-font (&optional (name "Helvetica") (encoding :win-ansi-encoding))
+(defun get-font (&optional (name "helvetica") (encoding :win-ansi-encoding))
+  (setf name (string-downcase name))
   (let ((font (gethash (list name (get-encoding encoding)) *font-cache*)))
     (if font
 	font

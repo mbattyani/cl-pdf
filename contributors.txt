@@ -4,11 +4,11 @@ I'd like to thank the following individuals for their contributions to cl-pdf:
 Alexey Dejneka (Parsing of the AFM files)
 Jörg Höhle (clisp zlib)
 Gary Warren King (MCL port)
-Suresh Madhu (T3 fonts)
 Eduardo Muñoz (geometrical functions (arc, circle, etc.))
 Alberto Riva (ACL zlib)
 Ole Rohne (gstates)
 Lars Rustemeier (code128 barcodes)
+Madhu Suresh (T3 fonts)
 Carlos Ungil (plot-xy, Corman Lisp port)
 Edi Weitz (cmucl zlib)
 

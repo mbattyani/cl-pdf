@@ -183,8 +183,8 @@
                  `(key ,key ((,param ,type)) (setf (,param font-metrics) (* 0.001 ,param)))))
       (process-keywords
        (key "EndFontMetrics" ()
-	    (setf (gethash (font-name font-metrics) *font-metrics*) font-metrics
-		  (gethash (full-name font-metrics) *font-metrics*) font-metrics
+	    (setf (gethash (string-downcase (font-name font-metrics)) *font-metrics*) font-metrics
+;		  (gethash (string-downcase (full-name font-metrics)) *font-metrics*) font-metrics
 		  (leading font-metrics)(- 1 (descender font-metrics))
 		  (italic-sin font-metrics)(sin (/ (* pi (italic-angle font-metrics)) -180)))
 	    (return-from afm-font-metrics font-metrics))
