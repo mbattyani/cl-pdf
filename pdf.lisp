@@ -188,7 +188,7 @@
  ;;; Used to embrace a pdf string used in places other than content streams,
   ;; e.g. annotations.
   (let ((string (if (stringp obj) obj (princ-to-string obj))))
-    (with-output-to-string (stream nil :element-type (array-element-type string))
+    (with-output-to-string (stream nil #-cmu :element-type #-cmu (array-element-type string))
       (write-char #\( stream)
       (loop for char across string
             do (case char ((#\( #\) #\\) (write-char #\\ stream)))
