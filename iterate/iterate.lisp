@@ -285,13 +285,13 @@
     (flet . 		    walk-flet)
     (function . 	    walk-function)
     (go . 		    nil)
-    (if . 		    walk-if)
+    (if . 		    walk-cdr) ; also walk test form
     (labels . 		    walk-flet)
     (let . 		    walk-let)
     (let* . 		    walk-let)
+    (load-time-value .      nil)
     (locally .              walk-locally)
     (macrolet . 	    walk-macrolet)
-    (symbol-macrolet . 	    walk-symbol-macrolet)
     (multiple-value-call .  walk-cdr)
     (multiple-value-prog1 . walk-cdr)
     (progn . 		    walk-progn)
@@ -299,11 +299,11 @@
     (quote . 		    nil)
     (return-from . 	    walk-cddr)
     (setq . 		    walk-setq)
+    (symbol-macrolet . 	    walk-symbol-macrolet)
     (tagbody . 		    walk-cdr)
     (the . 		    walk-cddr)
     (throw . 		    walk-cdr) 
     (unwind-protect . 	    walk-cdr)
-    (load-time-value .      nil)
 
     ;; Next some special cases:
     ;; m-v-b is a macro, not a special form, but we want to recognize bindings.
@@ -311,10 +311,23 @@
     (multiple-value-bind .  walk-multiple-value-bind)
     ;; Allegro treats cond as a special form, it does not macroexpand.
     #+allegro (cond .	    walk-cond)
+    ;; Prior to 2005, CLISP expanded handler-bind into some
+    ;; sys::%handler-bind syntax not declared as a special operator.
+    #+clisp (handler-bind . walk-cddr) ; does not recognize clauses in handlers
+    ;; A suitable generalization would be a pattern language that describes
+    ;; which car/cdr are forms to be walked, declarations or structure.
 
     ;; Finally some cases where code compiled from the macroexpansion
     ;; may not be as good as code compiled from the original form:
-    (nth-value .	    walk-cdr)))
+    ;; -- and iterate's own expansion becomes more readable
+    (and .		    walk-cdr)
+    (ignore-errors .	    walk-cdr) ; expands to handler-bind in CLISP
+    (multiple-value-list .  walk-cdr)
+    (nth-value .	    walk-cdr)
+    (or .		    walk-cdr)
+    (prog1 .		    walk-cdr)
+    (prog2 .		    walk-cdr)
+    (psetq . 		    walk-setq)))
 
 
 ;;; For clauses that are "special" in the sense that they don't conform to the
@@ -640,7 +653,7 @@
       ;; it and print out a warning.
       ;;  --Jeff Siskind says try binding *macroexpand-hook* to #'funcall.
       (multiple-value-bind (ex-form expanded?)
-	  (macroexpand form *env*)
+	  (macroexpand-1 form *env*)
 	(cond
 	 (expanded? (walk ex-form))
 	 (t	    (clause-warning "The form ~a is a macro that won't expand. ~
@@ -668,6 +681,10 @@
 	(values (list (cons bod abod)) (nconc decs adecs) (nconc init ainit)
 		(nconc step astep) (nconc final afinal) 
 		(nconc final-prot afinal-prot)))))
+   #+clisp ; some macros expand into ((setf foo) value other-args...)
+   ;; reported by Marco Baringer on 24 Jan 2005
+   ((typep form '(cons (cons (eql setf) *) *))
+    (apply #'walk-cdr form))
    (t
     (clause-error "The form ~a is not a valid Lisp expression" form))))
 
@@ -816,6 +833,7 @@
       (clause-error "Declarations must occur at top-level, or inside a ~
   binding context like let or multiple-value-bind.")))
 
+#+nil ; (to be removed next round) prefer walk-cdr which walks the test form
 (defun walk-if (if test then &optional else)
   (declare (ignore if))
   (let ((*top-level?* nil))
@@ -950,7 +968,7 @@
 #+allegro
 (defun walk-cond (cond &rest stuff)
   ;; Because the allegro compiler insists on treating COND as a special form,
-  ;; and because it macroexpands (cond #) into (cond #)!
+  ;; and because some version macroexpands (cond #) into (cond #)!
   (declare (ignore cond))
   (if (null stuff)
       nil
@@ -993,7 +1011,7 @@
 			      (cdr ppclause)))
 		  (func (clause-info-function info)))
 	      (if (macro-function func *env*)
-		  (walk (macroexpand (cons func args) *env*))
+		  (walk (macroexpand-1 (cons func args) *env*))
 		  (apply-clause-function func args))))
 	   (t
 	    (clause-error "No iterate function for this clause; do ~
@@ -2011,12 +2029,13 @@
    ((symbolp (car form))
     (cond
      ((or (special-operator-p (car form)) 
-	  (member (car form) '(flet labels let let*))) ; Lucid doesn't think
-						       ; that these are
-						       ; special forms.
+	  ;; Lucid doesn't think that these are special forms
+	  ;; and we need to handle declarations:
+	  (member (car form) '(declare multiple-value-bind
+			       flet labels let let*) :test #'eq))
       (case (car form)
-	((catch if multiple-value-call multiple-value-prog1 progn progv
-	  setq tagbody throw unwind-protect)
+	((catch if locally multiple-value-call multiple-value-prog1
+	  progn progv setq tagbody throw unwind-protect)
 	    (free-vars-list (cdr form) bound-vars))
 	((block eval-when return-from the)
 	    (free-vars-list (cddr form) bound-vars))
@@ -2028,7 +2047,7 @@
 	    (nconc (mapcan #L(free-vars-fspec !1 bound-vars)
 			   (second form))
 		   (free-vars-list (cddr form) bound-vars)))
-	(let
+	((let symbol-macrolet)
 	    (let* ((bindings (second form))
 		   (body (cddr form))
 		   (vars (mapcar #L(if (consp !1) (car !1) !1)
@@ -2051,7 +2070,7 @@
 	(otherwise
 	    nil)))
      ((macro-function (car form) *env*)
-      (free-vars (macroexpand form *env*) bound-vars))
+      (free-vars (macroexpand-1 form *env*) bound-vars))
      (t ; function call
       (free-vars-list (cdr form) bound-vars))))
    ((and (consp (car form)) (eq (caar form) 'lambda))

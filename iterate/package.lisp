@@ -1,14 +1,19 @@
+;;; Some of the 7 extremely random interface commands:
+
+;;; use strings here so that there's no iterate symbol in USER.
+
 (defpackage #:iterate
   (:use #:cl)
   (:nicknames #:ITER)
-  (:export #:iterate #:iter #:display-iterate-clauses #:declare-variables
-	   #:defmacro-clause #:defclause-sequence #:dsetq))
+  (:export #:iterate #:iter #:display-iterate-clauses
+	   #:defsynonym #:dsetq #:declare-variables
+	   #:defmacro-clause #:defmacro-driver #:defclause-sequence))
 
 (in-package #:iterate)
 
-;;; work around sbcl's obnoxious stadnard compliance
+;;; work around sbcl's obnoxious standard compliance
 
-(defmacro defconst (name value &optional doc)
+(defmacro defconst (name value &optional (doc ""))
    `(eval-when (:compile-toplevel :load-toplevel :execute)
       (unless (boundp ',name)
         ,(if doc
@@ -26,7 +31,6 @@
     with while until adjoining nconcing appending
     nunioning unioning reducing accumulate accumulating))
 
-(dolist (clause +clause-names+)
-  (export clause '#:iterate))
+(export +clause-names+ '#:iterate)
 
 ;;; arch-tag: "b8bb0bb6-313c-11d8-abb9-000c76244c24"
