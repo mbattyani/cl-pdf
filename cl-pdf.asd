@@ -13,6 +13,8 @@
   (pushnew :uffi cl:*features*)
   (print "UFFI loaded."))
 
+(load (merge-pathnames "iterate/iterate.asd" *load-truename*))
+
 (defsystem :cl-pdf
   :name "cl-pdf"
   :author "Marc Battyani <marc.battyani@fractalconcept.com>"
@@ -37,4 +39,5 @@
 	       (:file "pdf-geom" :depends-on ("pdf-base"))
 	       (:file "text" :depends-on ("pdf-base"))
 	       (:file "bar-codes" :depends-on ("pdf-geom"))
-	       (:file "chart" :depends-on ("text" "pdf-geom"))))
+	       (:file "chart" :depends-on ("text" "pdf-geom")))
+  :depends-on (:iterate))

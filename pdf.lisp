@@ -168,8 +168,8 @@
   ((title :accessor title :initarg :title :initform nil)
    (reference :accessor reference :initform nil :initarg :reference)
    (sub-levels :accessor sub-levels :initform nil)
-   (prev   :accessor prev   :initform nil)
-   (next   :accessor next   :initform nil)))
+   (prev-outline   :accessor prev-outline   :initform nil)
+   (next-outline   :accessor next-outline   :initform nil)))
 
 (defun enter-outline-level (title ref-name)
   (let ((outline (make-instance 'outline :title title :reference (get-named-reference ref-name)))
@@ -205,15 +205,15 @@
   (loop for prev = nil then outline
 	for outline in outlines
 	do
-	(when prev (setf (next prev) outline))
-	(setf (prev outline) prev)
+	(when prev (setf (next-outline prev) outline))
+	(setf (prev-outline outline) prev)
 	(compute-outline-tree (sub-levels outline) outline))
   (loop for outline in outlines
 	for sub-levels = (sub-levels outline)
 	for first = (first sub-levels)
 	for last = (first (last sub-levels))
 	do
-	(with-slots ((reference reference)(prev prev)(next next)) outline
+	(with-slots ((reference reference)(prev-outline prev-outline)(next-outline next-outline)) outline
 	  (setf (content outline)
 		(make-instance 'dictionary
   		   :dict-values `(,@(if parent `(("/Title" . ,(pdf-string (title outline)))
@@ -221,8 +221,8 @@
 					'(("/Type" "/Outlines")))
 				  ,@(when first `(("/First" . ,first)))
 				  ,@(when last `(("/Last" . ,last)))
-				  ,@(when prev `(("/Prev" . ,prev)))
-				  ,@(when next `(("/Next" . ,next)))
+				  ,@(when prev-outline `(("/Prev" . ,prev-outline)))
+				  ,@(when next-outline `(("/Next" . ,next-outline)))
 				  ,@(when reference `(("/Dest" . ,reference)))
 				  ("/Count" . "0")))))))
 
