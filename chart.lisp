@@ -234,6 +234,7 @@
    (height :accessor height :initform 0 :initarg :height)
    (label-names :accessor label-names :initform nil :initarg :label-names)
    (series :accessor series :initform () :initarg :series)
+   (stacked-series :accessor stacked-series :initform () :initarg :stacked-series)
    (labels&colors :accessor labels&colors :initform () :initarg :labels&colors)
    (background-color :accessor background-color :initform '(1 1 1) :initarg :background-color)
    (h-lines-width :accessor h-lines-width :initform 0.2 :initarg :h-lines-width)
@@ -258,12 +259,19 @@
 	       :x (x histo) :y (y histo) :height (height histo)
                (append y-axis-options
                        (list
-                        :min-value (reduce #'min (mapcar #'(lambda (values)
-                                                             (reduce #'min values))
-                                                         (series histo)))
-                        :max-value (reduce #'max (mapcar #'(lambda (values)
-                                                             (reduce #'max values))
-                                                         (series histo)))))))
+                        :min-value (if (stacked-series histo)
+				       0.0
+				       (reduce #'min (mapcar #'(lambda (values)
+								 (reduce #'min values))
+							     (series histo))))
+                        :max-value (reduce #'max
+					   (if (stacked-series histo)
+					       (apply 'mapcar #'(lambda (&rest values)
+								  (apply '+ values))
+						      (series histo))
+					       (mapcar #'(lambda (values)
+							   (reduce #'max values))
+						       (series histo))))))))
   (setf (x-axis histo)
 	(apply #'make-instance 'horizontal-histo-axis
                :x (x histo) :y (y histo) :width (width histo)
@@ -277,7 +285,7 @@
 	       legend-options))))
 
 (defmethod draw-object ((obj histogram))
-  (let* ((nb-series (length (series obj)))
+  (let* ((nb-series (if (stacked-series obj) 1 (length (series obj))))
 	 (nb-values (length (first (series obj))))
 	 (width (width obj))
 	 (group-width (/ width nb-values))
@@ -286,7 +294,7 @@
 	 (min-value (axis-min (y-axis obj)))
 	 (scale (axis-scale (y-axis obj))))
     (with-saved-state
-      (translate (x obj)(y obj))
+	(translate (x obj)(y obj))
       (set-line-width (line-width obj))
       (apply #'set-rgb-stroke (line-color obj))
       (apply #'set-rgb-fill (background-color obj))
@@ -300,15 +308,26 @@
 	    (stroke))
       (set-line-width (line-width obj))
       (apply #'set-rgb-stroke (line-color obj))
-      (loop for serie in (series obj)
-	    for gx from (* 0.5 spacing) by bar-width
-	    for (name color) in (labels&colors obj) do
-	    (apply #'set-rgb-fill color)
-	    (loop for value in serie
-		  for dy = (* (- value min-value) scale)
-		  for bx from gx by group-width do
-		  (basic-rect bx 0 bar-width dy)
-		  (fill-and-stroke)))))
+      (if (stacked-series obj)
+	  (loop for values in (apply 'list (series obj))
+		for gx from (* 0.5 spacing) by bar-width
+		for bx from gx by group-width do
+		(loop for y = 0.0 then (+ y dy)
+		      for value in values
+		      for (name color) in (labels&colors obj)
+		      for dy = (* value scale) do
+		      (apply #'set-rgb-fill color)
+		      (basic-rect bx y bar-width dy)
+		      (fill-and-stroke)))
+	  (loop for serie in (series obj)
+		for gx from (* 0.5 spacing) by bar-width
+		for (name color) in (labels&colors obj) do
+		(apply #'set-rgb-fill color)
+		(loop for value in serie
+		      for dy = (* (- value min-value) scale)
+		      for bx from gx by group-width do
+		      (basic-rect bx 0 bar-width dy)
+		      (fill-and-stroke))))))
   (draw-object (x-axis obj))
   (draw-object (y-axis obj))
   (draw-object (legend obj)))

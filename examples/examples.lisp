@@ -318,6 +318,7 @@
 							     ("Serie 2" (0.0 1.0 0.0)))
 					    :series '((42 46 48 42)(40 38 51 46))
 					    :background-color '(0.9 0.9 0.9)
+					    :stacked-series nil ;;; try also with t
 					    :x-axis-options ()
 					    :y-axis-options ()
 					    :legend-options ()))
