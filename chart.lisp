@@ -310,7 +310,7 @@
       (set-line-width (line-width obj))
       (apply #'set-rgb-stroke (line-color obj))
       (if (stacked-series obj)
-	  (loop for values in (apply 'list (series obj))
+	  (loop for values in (apply 'mapcar 'list (series obj))
 		for gx from (* 0.5 spacing) by bar-width
 		for bx from gx by group-width do
 		(loop for y = 0.0 then (+ y dy)

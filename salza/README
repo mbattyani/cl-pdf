@@ -1,0 +1,10 @@
+Salza
+-----
+
+Salza is an implementation of the DEFLATE compressed data format,
+described in RFC 1951, and the ZLIB compressed data format, described
+in RFC 1950. Currently, only output is supported.
+
+Documentation is coming. For now, see examples/png.lisp and
+examples/gzip.lisp to see example uses of the interfaces for DEFLATE
+and ZLIB functionality.

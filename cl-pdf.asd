@@ -6,7 +6,16 @@
 
 (in-package asdf)
 
-#-uffi
+;;;Choose the zlib implementation you want to use (only one!)
+;(pushnew :use-uffi-zlib cl:*features*)
+;(pushnew :use-salza-zlib cl:*features*)
+;(pushnew :use-abcl-zlib cl:*features*)
+;(pushnew :use-no-zlib cl:*features*)
+
+#-(or use-uffi-zlib use-salza-zlib use-abcl-zlib use-no-zlib)
+(Error "You must choose which zlib version you want to use")
+
+#-(or uffi (not use-uffi-zlib))
 (ignore-errors
   (print "Trying to load UFFI:")
   (asdf:operate 'asdf:load-op :uffi)
@@ -14,6 +23,9 @@
   (print "UFFI loaded."))
 
 (load (merge-pathnames "iterate/iterate.asd" *load-truename*))
+
+#+use-salza-zlib
+(load (merge-pathnames "salza/salza.asd" *load-truename*))
 
 (defsystem :cl-pdf
   :name "cl-pdf"
@@ -27,8 +39,8 @@
 		    (pushnew :cl-pdf cl:*features*))
   :components ((:file "defpackage")
 	       (:file "config" :depends-on ("defpackage"))
-	       (:file "init" :depends-on ("config"))
-	       (:file "zlib" :depends-on ("init"))
+	       #+use-uffi-zlib (:file "init" :depends-on ("config"))
+	       (:file "zlib" :depends-on (#+use-uffi-zlib "init"))
 	       (:file "font-metrics"  :depends-on ("config"))
 	       (:file "encodings"  :depends-on ("defpackage"))
 	       (:file "t1-font" :depends-on ("font-metrics" "encodings"))
@@ -41,4 +53,4 @@
 	       (:file "text" :depends-on ("pdf-base"))
 	       (:file "bar-codes" :depends-on ("pdf-geom"))
 	       (:file "chart" :depends-on ("text" "pdf-geom")))
-  :depends-on (:iterate))
+  :depends-on (:iterate #+use-salza-zlib :salza))

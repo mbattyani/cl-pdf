@@ -6,7 +6,6 @@
 
 (defvar *zlib-loaded* nil)
 
-#+uffi
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun find-zlib-path* (name)
   (uffi:find-foreign-library
@@ -19,7 +18,7 @@
   (or (find-zlib-path* "libz")
       (find-zlib-path* "zlib1"))))
 
-#+(and uffi (or cmu sbcl))
+#+(or cmu sbcl)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (let ((zlib-path (find-zlib-path)))
     (when zlib-path

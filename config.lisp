@@ -31,6 +31,7 @@
 (pushnew :pdf-binary *features*)
 
 ;(eval-when (:compile-toplevel :load-toplevel :execute)
+#+use-uffi-zlib
 (defvar *zlib-search-paths* `(,(directory-namestring *load-truename*)
                               #+lispworks
                               ,(directory-namestring (lw:lisp-image-name))
