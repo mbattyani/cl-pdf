@@ -56,6 +56,26 @@
 	    (uffi:free-foreign-object destlen)
 	    (uffi:free-foreign-object dest)))))))
 
+#+abcl
+(defun compress-string (i-string)
+  (let* ((i-string-bytes
+	  (java:jcall
+	   (java:jmethod "java.lang.String" "getBytes" "java.lang.String") i-string "UTF-8"))
+	 (out-array (java:jnew (java:jconstructor "java.io.ByteArrayOutputStream")))
+	 (compresser (java:jnew (java:jconstructor "java.util.zip.Deflater" "int")
+				(java:jfield "java.util.zip.Deflater" "BEST_COMPRESSION")))
+	 (defl-out-stream
+	  (java:jnew
+	   (java:jconstructor
+	    "java.util.zip.DeflaterOutputStream" "java.io.OutputStream" "java.util.zip.Deflater")
+	   out-array compresser)))
+    (java:jcall (java:jmethod "java.util.zip.Deflater" "setInput" "[B") compresser i-string-bytes)
+      (java:jcall (java:jmethod "java.util.zip.DeflaterOutputStream" "close") defl-out-stream)
+      (java:jcall (java:jmethod "java.io.ByteArrayOutputStream" "toString") out-array)))
+
+#+abcl
+(setf *compress-streams* t)
+
 #|
 Unfinished Work!
 Using compression by block to avoid the huge cstring allocation of compress.

@@ -115,7 +115,7 @@
 		     :width width :height height  :data data
                      :bits-per-color bits-per-color  :palette palette  :mask mask)))))
 
-(defmethod make-image ((png png-image) &key)
+(defmethod make-image ((png png-image) &key type)
   ;; For color key masking, the Mask entry is an array of 2*N integers,
   ;; [min1 max1 ¥ minN maxN], where N is the number of color components in the
   ;; image's color space.

@@ -283,7 +283,7 @@
   (apply #'make-image (merge-pathnames object (make-pathname :type type))
          args))
 
-(defmethod make-image ((jpeg jpeg-image) &key)
+(defmethod make-image ((jpeg jpeg-image) &key type)
   (make-instance 'pdf:image
          :bits (data jpeg)
          :width (width jpeg) :height (height jpeg)

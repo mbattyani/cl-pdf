@@ -470,7 +470,7 @@
 					    (reduce #'max
 						    (mapcar #'first values)))
 					(series plot)))))))
-  (when (> (length (series plot)) 1)
+  (when (labels&colors plot)
     (setf (legend plot)
 	(apply #'make-instance 'legend
 	       :x (or (getf legend-options :x) (+ (x plot) (width plot) 10))
