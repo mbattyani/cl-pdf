@@ -1,3 +1,28 @@
+;;; cl-pdf copyright 2002-2004 Marc Battyani see license.txt for details of the license
+;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
+
+This is the change log for cl-pdf. 
+See also contributors.txt and to-do.txt
+
+Current version:
+
+08 February 2004: Release 2.1
+   Added Custom encodings.  [Thanks to Dmitri Ivanov]
+   Fonts without font data. [Thanks to Dmitri Ivanov]
+   Added a few with-standard-io-syntax so that the pdf are generated 
+         correctly when people change the printer settings.
+   Added a :stacked-series option to the histograms.
+   Changed zlib (again!) for dynamic loading of the library in delivered applications.
+   Added a *default-encoding* special variable. 
+   Added pdf meta information to documents.[Thanks to Eric Marsden]
+   Corrected handling of the min/max-value in the charts.[Thanks to Eric Marsden]
+   Corrected pfb file loading.
+   Font names are case insensitive now.
+   Added improved code128 barcodes [Thanks to Lars Rustemeier].
+
+26 December 2003:
+   Mailing Lists and code repository.
+
 24 October 2003: Release 2.0.3
    Only loads the AFM files for the 14 standard fonts.
    The other AFM files must be loaded with the font data by load-t1-font.
