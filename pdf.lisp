@@ -61,7 +61,8 @@
    (subject :accessor subject :initarg :subject :initform nil)))
 
 (defmethod initialize-instance :after ((doc document) &rest init-options
-				       &key empty author title subject keywords &allow-other-keys)
+				       &key (creator "cl-pdf") empty author title subject keywords
+				       &allow-other-keys)
   (declare (ignore init-options))
   (unless empty
     (let ((*document* doc))
@@ -76,7 +77,7 @@
 					  ("/Pages" . ,(root-page doc)))))
       (setf (content (docinfo doc))
             (make-instance 'dictionary
-                           :dict-values `(("/Creator" . ,(format nil "(cl-pdf version ~A)" *version*))
+                           :dict-values `(("/Creator" . ,(format nil "~a (cl-pdf ~A)" creator *version*))
                                           ,@(when author `(("/Author" . ,(format nil "(~A)" author))))
                                           ,@(when title `(("/Title" . ,(format nil "(~A)" title))))
                                           ,@(when subject `(("/Subject" . ,(format nil "(~A)" subject))))
@@ -396,7 +397,7 @@
 				  (file-position *pdf-stream*)(gen-number obj))
 			  *xrefs*)
       (format *pdf-stream* "~d ~d obj~%" (obj-number obj)(gen-number obj))
-      (write-object (content obj))
+      (when (content obj)(write-object (content obj)))
       (write-string "endobj" *pdf-stream*)
       (write-char #\Newline *pdf-stream*))
     (format *pdf-stream* "~d ~d R" (obj-number obj)(gen-number obj))))
