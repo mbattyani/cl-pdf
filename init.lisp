@@ -7,16 +7,11 @@
 (defvar *zlib-loaded* nil)
 
 (defun find-zlib-path ()
-  #-(or macosx darwin)
   (uffi:find-foreign-library
    "libz"
    *zlib-search-paths*
    :drive-letters '("C" "D" "E")
-   :types '("so" "a" "dll"))
-  #+(or macosx darwin)
-  (uffi:find-foreign-library
-   "z"
-   `(,(pathname-directory *load-pathname*))))
+   :types '("so" "a" "dll" "dylib")))
 
 (defun load-zlib (&optional force)
   (when force (setf *zlib-loaded* nil))

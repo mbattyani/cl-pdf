@@ -342,7 +342,8 @@
 (defmethod write-object ((obj dictionary) &optional root-level)
   (declare (ignorable root-level))
   (write-string "<< " *pdf-stream*)
-  (loop for (key . val) in (dict-values obj) do
+  (loop for (key . val) in (dict-values obj)
+	when val do
 	(write-string key *pdf-stream*)
 	(write-char #\Space *pdf-stream*)
 	(write-object val)
@@ -406,7 +407,7 @@
 
 (defmethod write-object ((obj t) &optional root-level)
   (declare (ignorable root-level))
-  (format *pdf-stream* "~a" obj))
+  (princ obj *pdf-stream*))
 
 (defmethod write-object ((array array) &optional root-level)
   (declare (ignorable root-level))

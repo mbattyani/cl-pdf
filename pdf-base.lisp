@@ -144,31 +144,40 @@
 
 (def-pdf-op set-rgb-stroke (r g b) "~,3f ~,3f ~,3f RG~%")
 
-(defmethod set-color-stroke ((color list))
-  (format *page-stream* "~,3f ~,3f ~,3f RG~%" (first color)(second color)(third color)))
+(defgeneric get-rgb (color)
+ (:method ((color list))  
+  (values (first color)(second color)(third color)))
 
-(defmethod set-color-stroke ((color vector))
-  (format *page-stream* "~,3f ~,3f ~,3f RG~%" (aref color 0)(aref color 1)(aref color 2)))
+ (:method ((color vector))
+  #+lispworks
+  (case (aref color 0)		; convert from (color:make-rgb ...) or other model
+    (:RGB	(values (aref color 1)(aref color 2)(aref color 3)))
+    (otherwise	(values (aref color 0)(aref color 1)(aref color 2))))
+  #-lispworks
+  (values (aref color 0)(aref color 1)(aref color 2)))
 
-(defmethod set-color-stroke ((color string)) ;takes a CSS color string
-  (format *page-stream* "~,3f ~,3f ~,3f RG~%"
-	  (/ (parse-integer color :start 1 :end 3 :radix 16) 255.0)
+ (:method ((color string))	; takes a CSS color string like "#CCBBFF"
+  (values (/ (parse-integer color :start 1 :end 3 :radix 16) 255.0)
 	  (/ (parse-integer color :start 3 :end 5 :radix 16) 255.0)
 	  (/ (parse-integer color :start 5 :end 7 :radix 16) 255.0)))
+
+ (:method ((color integer))	; a la CSS but specified as a Lisp number like #xCCBBFF
+  (values (/ (ldb (byte 8 16) color) 255.0)
+          (/ (ldb (byte 8 8) color) 255.0)
+          (/ (ldb (byte 8 0) color) 255.0))) 
+
+ (:method ((color symbol))	; :blue, :darkgreen, or win32:color_3dface
+  #+lispworks
+  (lw:when-let (color (color:get-color-spec color))
+    (get-rgb color))) )
+
+(defun set-color-stroke (color)
+  (multiple-value-call #'set-rgb-stroke (get-rgb color)))
+
+(defun set-color-fill (color)
+  (multiple-value-call #'set-rgb-fill (get-rgb color)))
 
 (def-pdf-op set-rgb-fill (r g b) "~,3f ~,3f ~,3f rg~%")
-
-(defmethod set-color-fill ((color list))
-  (format *page-stream* "~,3f ~,3f ~,3f rg~%" (first color)(second color)(third color)))
-
-(defmethod set-color-fill ((color vector))
-  (format *page-stream* "~,3f ~,3f ~,3f rg~%" (aref color 0)(aref color 1)(aref color 2)))
-
-(defmethod set-color-fill ((color string))
-  (format *page-stream* "~,3f ~,3f ~,3f rg~%"
-	  (/ (parse-integer color :start 1 :end 3 :radix 16) 255.0)
-	  (/ (parse-integer color :start 3 :end 5 :radix 16) 255.0)
-	  (/ (parse-integer color :start 5 :end 7 :radix 16) 255.0)))
 
 (def-pdf-op set-cymk-stroke (c y m k) "~,3f ~,3f ~,3f ~,3f K~%")
 
