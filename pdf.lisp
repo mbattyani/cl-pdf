@@ -434,22 +434,23 @@
    (let ((*xrefs* (make-array 10 :adjustable t :fill-pointer 0))
 	 startxref
 	 (*pdf-stream* s))
-     (process-outlines document)
-     (vector-push-extend "0000000000 65535 f " *xrefs*)
-     (write-line +pdf-header+ s)
-     (loop for obj across (objects document)
-	   for first = t then nil
-	   if obj do (write-object obj t)
-	   else do (unless first (vector-push-extend "0000000000 00001 f " *xrefs*)))
-     (setf startxref (file-position s))
-     (format *pdf-stream* "xref~%0 ~d~%" (length *xrefs*))
-     (loop for xref across *xrefs*
-	   do (write-line xref s))
-     (format s "trailer~%<< /Size ~d~%/Root " (length *xrefs*));(1- (length (objects document))))
-     (write-object (catalog document))
-     (format s "/Info ")
-     (write-object (docinfo document))
-     (format s "~%>>~%startxref~%~d~%%%EOF~%" startxref)))
+     (with-standard-io-syntax
+       (process-outlines document)
+       (vector-push-extend "0000000000 65535 f " *xrefs*)
+       (write-line +pdf-header+ s)
+       (loop for obj across (objects document)
+	     for first = t then nil
+	     if obj do (write-object obj t)
+	     else do (unless first (vector-push-extend "0000000000 00001 f " *xrefs*)))
+       (setf startxref (file-position s))
+       (format *pdf-stream* "xref~%0 ~d~%" (length *xrefs*))
+       (loop for xref across *xrefs*
+	     do (write-line xref s))
+       (format s "trailer~%<< /Size ~d~%/Root " (length *xrefs*));(1- (length (objects document))))
+       (write-object (catalog document))
+       (format s "/Info ")
+       (write-object (docinfo document))
+       (format s "~%>>~%startxref~%~d~%%%EOF~%" startxref))))
 
 (defmethod write-document ((filename pathname) &optional (document *document*))
    (with-open-file (s filename :direction :output :if-exists :supersede
@@ -467,8 +468,9 @@
 
 (defmacro with-page ((&rest args) &body body)
   `(let* ((*page* (make-instance 'page ,@args)))
-    (setf (content (content-stream *page*))
-     (with-output-to-string (*page-stream*)
-			    ,@body))
-    t))
+    (with-standard-io-syntax
+	(setf (content (content-stream *page*))
+	 (with-output-to-string (*page-stream*)
+	   ,@body)))
+     t))
 
