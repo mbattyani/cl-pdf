@@ -12,6 +12,7 @@
 (defvar *outlines-stack* nil)
 (defvar *root-page* nil)
 (defvar *page* nil)
+(defvar *page-number* nil)
 (defvar *page-stream* nil)
 (defvar *pdf-stream* nil)
 (defvar *xrefs* nil)
@@ -469,11 +470,13 @@
 (defmacro with-document ((&rest args) &body body)
   `(let* ((*document* (make-instance 'document ,@args))
 	  (*outlines-stack* (list (outline-root *document*)))
-	  (*root-page* (root-page *document*)))
+	  (*root-page* (root-page *document*))
+	  (*page-number* 0))
     ,@body))
 
 (defmacro with-page ((&rest args) &body body)
   `(let* ((*page* (make-instance 'page ,@args)))
+    (incf *page-number*)
     (with-standard-io-syntax
 	(setf (content (content-stream *page*))
 	 (with-output-to-string (*page-stream*)

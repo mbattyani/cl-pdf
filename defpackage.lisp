@@ -37,6 +37,5 @@
    #:vertical-value-axis #:horizontal-histo-axis #:legend #:histogram #:draw-object
    #:pie-chart #:plot-xy
    #:load-t1-font #:encoding #:get-encoding
-   #:draw-bar-code128
+   #:draw-bar-code128 #:*page-number*
 ))
-
