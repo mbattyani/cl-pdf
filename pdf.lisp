@@ -180,6 +180,21 @@
 (defun close-outline-level ()
   (pop *outlines-stack*))
 
+(defmacro string-append (&rest args)
+  #+lispworks `(lw:string-append ,@args)
+  #-lispworks `(concatenate 'string ,@args))
+
+(defun pdf-string (obj)
+ ;;; Used to embrace a pdf string used in places other than content streams,
+  ;; e.g. annotations.
+  (let ((string (if (stringp obj) obj (princ-to-string obj))))
+    (with-output-to-string (stream nil :element-type (array-element-type string))
+      (write-char #\( stream)
+      (loop for char across string
+            do (case char ((#\( #\) #\\) (write-char #\\ stream)))
+               (write-char char stream))
+      (write-char #\) stream))))
+
 (defmacro with-outline-level ((title ref-name) &body body)
  `(unwind-protect
    (progn (enter-outline-level ,title ,ref-name)
@@ -201,8 +216,7 @@
 	(with-slots ((reference reference)(prev prev)(next next)) outline
 	  (setf (content outline)
 		(make-instance 'dictionary
-  		   :dict-values `(,@(if parent `(("/Title" . ,(concatenate 'string "("
-									   (title outline) ")"))
+  		   :dict-values `(,@(if parent `(("/Title" . ,(pdf-string (title outline)))
 						 ("/Parent" . ,parent))
 					'(("/Type" "/Outlines")))
 				  ,@(when first `(("/First" . ,first)))
