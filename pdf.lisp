@@ -471,6 +471,7 @@
   `(let* ((*document* (make-instance 'document ,@args))
 	  (*outlines-stack* (list (outline-root *document*)))
 	  (*root-page* (root-page *document*))
+	  (*page* nil)
 	  (*page-number* 0))
     ,@body))
 
