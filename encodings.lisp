@@ -28,33 +28,45 @@
 	for code from 0
 	when char-name do (setf (gethash char-name char-codes) code)))
 
+(defmethod make-dictionary ((encoding encoding) &key &allow-other-keys)
+  (with-slots (base-encoding) encoding
+    (make-instance 'dictionary
+      :dict-values
+      `(("/Type" . "/Encoding")
+	("/Differences" . ,(compute-encoding-differences encoding nil))))))
+
+(defmethod print-object ((self encoding) stream)
+  (print-unreadable-object (self stream :identity t :type t)
+    (format stream "~a" (name self))))
+
 (defun get-encoding (encoding-designator)
   (gethash encoding-designator *encodings*))
 
-#+nil
-(defun compute-encoding-differences (encoding)
+(defun compute-encoding-differences (encoding &optional (from *standard-encoding*))
   (let ((differences (make-array 20 :fill-pointer 0 :adjustable t))
 	(range-started nil))
-    (flet ((start-range (code)
-	     (when (or (and code (not range-started))(and (not code) range-started))
-	       (setf range-started code)
-	       (when code (vector-push-extend code differences)))))
-      (loop with start-code = nil
-	    for standard-char-name across (char-names *standard-encoding*)
-	    for char-name across (char-names encoding)
-	    for code from 0
-	    do
-	    (cond
-	      ((and (not char-name) standard-char-name)
-	       (start-range code) (vector-push-extend ".notdef" differences))
-	      ((and char-name (not (equal char-name standard-char-name)))
-	       (start-range code)
-	       (vector-push-extend (concatenate 'string "/" char-name) differences))
-	      (t (start-range nil)))))
-    differences))
+    (if from
+	(flet ((start-range (code)
+		 (when (or (and code (not range-started))(and (not code) range-started))
+		   (setf range-started code)
+		   (when code (vector-push-extend code differences)))))
+	  (loop with start-code = nil
+		for standard-char-name across (char-names from)
+		for char-name across (char-names encoding)
+		for code from 0
+		do
+		(cond
+		  ((and (not char-name) standard-char-name)
+		   (start-range code) (vector-push-extend ".notdef" differences))
+		  ((and char-name (not (equal char-name standard-char-name)))
+		   (start-range code)
+		   (vector-push-extend (add-/ char-name) differences))
+		  (t (start-range nil)))))
+	(full-encoding-differences encoding))
+	differences))
 
 ;;; Just put all...
-(defun compute-encoding-differences (encoding)
+(defun full-encoding-differences (encoding)
   (let ((differences (make-array 20 :fill-pointer 0 :adjustable t)))
     (vector-push-extend 0 differences)
     (loop for char-name across (char-names encoding)
@@ -307,3 +319,75 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
 "a181" "a200" "a182" nil "a201" "a183" "a184" "a197" "a185" "a194" 
 "a198" "a186" "a195" "a187" "a188" "a189" "a190" "a191" nil )))
 
+;;; custom encoding by Dmitri Ivanov: divanov_nosp@m_aha.ru (replace _nosp@m_ by @ to reply)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Custom Encoding
+
+(defclass custom-encoding (encoding)
+ ((base-encoding :initarg :base-encoding :reader base-encoding :initform nil)))
+
+(defmethod initialize-instance :after ((encoding custom-encoding) &rest initargs
+                                       &key &allow-other-keys)
+  (with-slots (base-encoding) encoding
+    (when (and base-encoding
+               (or (stringp base-encoding) (symbolp base-encoding)))
+      (setf base-encoding (gethash base-encoding *encodings* base-encoding)))))
+
+
+
+(defmethod make-dictionary ((encoding custom-encoding) &key &allow-other-keys)
+  (with-slots (base-encoding) encoding
+    (make-instance 'dictionary
+      :dict-values
+      `(("/Type" . "/Encoding")
+        ,@(when base-encoding
+            `(("/BaseEncoding" . ,(add-/ (name base-encoding)))
+              ("/Differences" . ,(compute-encoding-differences encoding
+                                                               base-encoding))))))))
+
+;;; CAUTION:
+;;;  Basing on :win-ansi-encoding fails for embedded Type1 fonts!
+;;;  For some installed fonts that are not embedded, :win-ansi-encoding gets better
+;;;  results, so it should be specified explicitly for get-font.
+;;;  It seems that get-font should not have any default for the encoding parameter.
+
+(defvar *win-1251-encoding*
+  (make-instance 'custom-encoding
+                 :name "Win1251Encoding" :keyword-name :win-1251-encoding
+                 :base-encoding :standard-encoding   ;:win-ansi-encoding doesn't work!
+		 :standard-encoding nil                 
+                 :char-names #(
+	nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil
+	nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil
+	"space" "exclam" "quotedbl" "numbersign" "dollar" "percent" "ampersand"
+	"quotesingle" "parenleft" "parenright" "asterisk" "plus" "comma" "hyphen"
+	"period" "slash" "zero" "one" "two" "three" "four" "five" "six" "seven"
+	"eight" "nine" "colon" "semicolon" "less" "equal" "greater" "question" "at"
+	"A" "B" "C" "D" "E" "F" "G" "H" "I" "J" "K" "L" "M" "N" "O" "P" "Q" "R" "S"
+	"T" "U" "V" "W" "X" "Y" "Z" "bracketleft" "backslash" "bracketright"
+        "asciicircum" "underscore" "grave"
+        "a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" "l" "m" "n" "o" "p" "q" "r" "s"
+        "t" "u" "v" "w" "x" "y" "z" "braceleft" "bar" "braceright" "asciitilde"
+        nil "Djecyrillic" "Gjecyrillic" "quotesinglbase" "gjecyrillic" "quotedblbase"
+        "ellipsis" "dagger" "daggerdbl" "Euro" "perthousand" "Ljecyrillic"
+        "guilsinglleft" "Njecyrillic" "Kjecyrillic" "Tshecyrillic" "Dzhecyrillic"
+        "djecyrillic" "quoteleft" "quoteright" "quotedblleft" "quotedblright" "bullet"
+        "endash" "emdash" NIL "trademark" "ljecyrillic" "guilsinglright" "njecyrillic"
+        "kjecyrillic" "tshecyrillic" "dzhecyrillic" "space" "Ushortcyrillic"
+        "ushortcyrillic" "Jecyrillic" "currency" "Gheupturncyrillic" "brokenbar"
+        "section" "Iocyrillic" "copyright" "Ecyrillic" "guillemotleft" "logicalnot"
+        "hyphen" "registered" "Yicyrillic" "degree" "plusminus" "Icyrillic" "icyrillic"
+        "gheupturncyrillic" "mu" "paragraph" "periodcentered" "iocyrillic" "numero"
+        "ecyrillic" "guillemotright" "jecyrillic" "Dzecyrillic" "dzecyrillic" "yicyrillic"
+        "Acyrillic" "Becyrillic" "Vecyrillic" "Gecyrillic" "Decyrillic" "Iecyrillic"
+        "Zhecyrillic" "Zecyrillic" "Iicyrillic" "Iishortcyrillic" "Kacyrillic"
+        "Elcyrillic" "Emcyrillic" "Encyrillic" "Ocyrillic" "Pecyrillic" "Ercyrillic"
+        "Escyrillic" "Tecyrillic" "Ucyrillic" "Efcyrillic" "Khacyrillic" "Tsecyrillic"
+        "Checyrillic" "Shacyrillic" "Shchacyrillic" "Hardsigncyrillic" "Yericyrillic"
+        "Softsigncyrillic" "Ereversedcyrillic" "IUcyrillic" "IAcyrillic"
+        "acyrillic" "becyrillic" "vecyrillic" "gecyrillic" "decyrillic" "iecyrillic"
+        "zhecyrillic" "zecyrillic" "iicyrillic" "iishortcyrillic" "kacyrillic"
+        "elcyrillic" "emcyrillic" "encyrillic" "ocyrillic" "pecyrillic" "ercyrillic"
+        "escyrillic" "tecyrillic" "ucyrillic" "efcyrillic" "khacyrillic" "tsecyrillic"
+        "checyrillic" "shacyrillic" "shchacyrillic" "hardsigncyrillic" "yericyrillic"
+        "softsigncyrillic" "ereversedcyrillic" "iucyrillic" "iacyrillic")))

@@ -20,6 +20,10 @@
 (defun gen-name (prefix)
   (format nil "~a~d" prefix (incf *name-counter*)))
 
+(defgeneric make-dictionary (thing &key &allow-other-keys))
+
+(defgeneric font-descriptor (font-metrics &key embed errorp))
+
 (defclass dictionary ()
   ((dict-values :accessor dict-values :initform nil :initarg :dict-values)))
 
@@ -224,12 +228,10 @@
 (defclass encoding-object (indirect-object)
   ((encoding :accessor encoding :initarg :encoding)))
 
-(defmethod initialize-instance :after ((encoding-object encoding-object) &rest init-options &key
-				       encoding &allow-other-keys)
-  (setf (content encoding-object)
-	(make-instance 'dictionary
-		       :dict-values `(("/Type" . "/Encoding")
-				      ("/Differences" . ,(compute-encoding-differences encoding))))))
+(defmethod initialize-instance :after ((encoding-object encoding-object)
+                                       &rest init-options
+                                       &key encoding &allow-other-keys)
+  (setf (content encoding-object) (make-dictionary encoding)))
 
 (defun find-encoding-object (encoding)
   (let ((encoding-object (cdr (assoc encoding (encodings *document*)))))
@@ -242,35 +244,23 @@
   ((name :accessor name :initform (gen-name "/CLF") :initarg :name)
    (font :accessor font :initarg :font)))
 
-(defmethod initialize-instance :after ((font-object font-object) &rest init-options &key
-				       font &allow-other-keys)
-  (let* ((encoding-object (if (standard-encoding (encoding font))
-			      (concatenate 'string "/" (name (encoding font)))
-			      (find-encoding-object (encoding font))))
-	 (font-metrics (font-metrics font))
-	 (font-descriptor (font-descriptor font-metrics)))
-    (setf (content font-object)
-	  (make-instance 'dictionary
-             :dict-values `(("/Type" . "/Font")
-			    ("/Subtype" . ,(add-/ (font-type font-metrics)))
-			    ("/BaseFont" . ,(add-/ (font-name (font-metrics font))))
-			    ,@(when font-descriptor `(("/FirstChar" . 0)))
-			    ,@(when font-descriptor `(("/LastChar" . 255)))
-			    ,@(when font-descriptor `(("/Widths" . ,(pdf-widths font))))
-			    ,@(when font-descriptor `(("/FontDescriptor" . ,font-descriptor)))
-			    ("/Encoding" . ,encoding-object))))))
+(defmethod initialize-instance :after ((font-object font-object) &rest initargs
+                                       &key font (embed *embed-fonts*)
+                                       &allow-other-keys)
+  (setf (content font-object) (make-dictionary (font-metrics font)
+                                               :font font  :embed embed)))
 
-(defun find-font-object (font)
+(defun find-font-object (font &key (embed :default))
   (let ((font-object (cdr (assoc font (fonts *document*))))) 
     (unless font-object
-      (setf font-object (make-instance 'font-object :font font))
+      (setf font-object (make-instance 'font-object :font font :embed embed))
       (push (cons font font-object) (fonts *document*)))
     font-object))
 
-(defun add-font-to-page (font)
+(defun add-font-to-page (font &key (embed :default))
   (let ((font-object (cdr (assoc font (fonts *page*)))))
     (unless font-object
-      (setf font-object (find-font-object font))
+      (setf font-object (find-font-object font :embed embed))
       (push (cons font font-object) (fonts *page*))
       (add-dict-value (font-objects *page*) (name font-object) font-object))
     font-object))

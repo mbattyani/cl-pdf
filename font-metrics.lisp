@@ -17,6 +17,10 @@
    (left-italic-correction :accessor left-italic-correction :initarg :left-italic-correction)
    (bbox  :accessor bbox  :initarg :bbox)))
 
+(defmethod print-object ((self char-metrics) stream)
+  (print-unreadable-object (self stream :type t)
+    (format stream "~a" (name self))))
+
 (defclass font-metrics ()
   ((font-name :accessor font-name)
    (full-name :accessor full-name)
@@ -47,6 +51,10 @@
    (leading :accessor leading :initform 1)
 ;   (char-metrics :accessor char-metrics)
    (kernings :accessor kernings :initform (make-hash-table :test #'equal))))
+
+(defmethod print-object ((self font-metrics) stream)
+  (print-unreadable-object (self stream :identity t :type t)
+    (format stream "~a" (full-name self))))
 
 ;;; Utilities
 (defmacro mcond (&rest clauses &environment env)
@@ -235,7 +243,7 @@
 	      (stroke-width 0)
               (code -1)
 	      (name nil)
-	      (bbox nil))
+	      (bbox (font-bbox font-metrics)))
           (process-keywords-in-line
            (key "C" ((p-code integer)) (setq code p-code))
            (key "CH" ((p-code hex)) (setq code p-code))
@@ -246,13 +254,15 @@
 		(setf stroke-width (if (zerop urx) width (* 0.001 urx)))))
           (unless width
             (error "Width is not given for a character C ~D." code))
-	  (setf char-metrics (make-instance 'char-metrics :code code :name name :width width :bbox bbox
-					    :spacing (- width stroke-width)
-					    :left-italic-correction (* italic-sin (aref bbox 3))
-					    :right-italic-correction (* italic-sin (aref bbox 1))))
+	  (setf char-metrics
+		(make-instance 'char-metrics :code code :name name :width width :bbox bbox
+			       :spacing (- width stroke-width)
+			       :left-italic-correction (if bbox (* italic-sin (aref bbox 3)) 0)
+			       :right-italic-correction (if bbox (* italic-sin (aref bbox 1)) 0)))
 	  (when (plusp code)
 	    (setf (aref encoding code) char-metrics))
-	  (setf (gethash name metrics) char-metrics))))))
+	  (when name
+	    (setf (gethash name metrics) char-metrics)))))))
 
 (define-afm-section (afm-char-kernings "CharKernPairs")(stream characters kernings)
   (flet ((register-kern-pair (name1 name2 dx dy)
@@ -269,16 +279,35 @@
 	      (register-kern-pair name1 name2 dx 0)))))))
 
 (defun read-afm-file (filename &optional (font-metrics-class 'font-metrics))
-  (with-open-file (s filename :direction :input)
+  (with-open-file (s filename :direction :input :external-format +external-format+)
     (afm-font-metrics s font-metrics-class)))
 
 (defmethod font-type (font-metrics)
   (declare (ignore font-metrics))
   "Type1")
 
-(defmethod font-descriptor (font-metrics)
-  (declare (ignore font-metrics))
-  nil)
+(defmethod font-descriptor (font-metrics &key embed (errorp nil))
+  (declare (ignore font-metrics embed))
+  (if errorp
+      (error "Generic fonts do not have descriptors.")
+      nil))
+
+(defmethod make-dictionary ((fm font-metrics)
+                            &key font (encoding (encoding font)) (embed *embed-fonts*)
+                            &allow-other-keys)
+  (let ((font-descriptor (font-descriptor fm :embed embed :errorp nil)))
+    (make-instance 'dictionary :dict-values
+      `(("/Type" . "/Font")
+        ("/Subtype" . ,(add-/ (font-type fm)))
+        ("/BaseFont" . ,(add-/ (font-name fm)))
+        ("/Encoding" . ,(if (standard-encoding encoding)
+                            (add-/ (name encoding))
+                            (find-encoding-object encoding)))
+        ,@(when font-descriptor
+            `(("/FirstChar" . 0)
+              ("/LastChar" . 255)
+              ("/Widths" . ,(pdf-widths font))
+              ("/FontDescriptor" . ,font-descriptor))) )) ))
 
 (defun extract-font-metrics-encoding (font-metrics)
   (let ((encoding (or (get-encoding (encoding-scheme font-metrics))

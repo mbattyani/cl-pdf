@@ -12,6 +12,13 @@
 
 (defvar *font-cache* (make-hash-table :test #'equal))
 
+(defvar *embed-fonts* :default
+  "t, nil, or :default (methods make-font-dictionary and font-descriptor decide)")
+
+(defvar *compress-fonts* t "nil or decode filter designator")
+
+(defgeneric font-descriptor (font-metrics &key embed errorp))
+
 (defclass font ()
  ((name :accessor name :initform "helvetica" :initarg :name)
   (encoding :accessor encoding :initform *standard-encoding*)
@@ -21,6 +28,10 @@
   (kernings :accessor kernings :initform (make-hash-table))
   (characters :accessor characters :initform (make-array 256 :initial-element nil))
   (pdf-widths :accessor pdf-widths :initform (make-array 256 :initial-element 0))))
+
+(defmethod print-object ((self font) stream)
+  (print-unreadable-object (self stream :identity t :type t)
+    (format stream "~a" (name self))))
 
 (defmethod initialize-instance :after ((font font) &rest init-options &key encoding &allow-other-keys)
   (let ((font-metrics (gethash (name font) *font-metrics*)))
@@ -40,7 +51,9 @@
 	  and hyphen-code = nil
 	  for i from 0 to 255
 	  for char-name across (char-names (encoding font))
-	  for char = (gethash char-name font-characters void-char)
+	  for char = (or (gethash char-name font-characters)
+                         (aref (encoding-vector font-metrics) i)
+                         void-char)
 	  do (setf (aref characters i) char
 		   (aref pdf-widths i) (round (* 1000 (width char))))
 	  (when (and (not hyphen-code) (string= char-name "hyphen"))

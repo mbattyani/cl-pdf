@@ -47,17 +47,21 @@
 	  (length2 t1fm) length2
 	  (length3 t1fm) length3)))
 
-(defun load-t1-font (afm-file pfb-file)
+(defun load-t1-font (afm-file  &optional pfb-file)
   (let ((t1fm (read-afm-file afm-file 't1-font-metrics)))
-    (read-pfb-file pfb-file t1fm)
+    (when pfb-file
+      (read-pfb-file pfb-file t1fm))
     t1fm))
 
-(defmethod font-descriptor ((t1fm t1-font-metrics))
+(defmethod font-descriptor ((t1fm t1-font-metrics)
+                            &key (embed *embed-fonts*) (errorp t))
   (flet ((conv-dim (d) (round (* 1000 d))))
-    (make-instance 'pdf::indirect-object :content
-      (make-instance 'pdf::dictionary :dict-values
+    (make-instance 'indirect-object :content
+      (make-instance 'dictionary  ;:obj-number 0 :no-link t
+        :dict-values        
 	`(("/Type" . "/FontDescriptor")
 	  ("/FontName"  . ,(add-/ (font-name t1fm)))
+	  ;; 4=Symbolic - contains characters outside the standard Latin character set.
 	  ("/Flags" . 4)
 	  ("/FontBBox" . ,(map 'vector #'conv-dim (font-bbox t1fm)))
 	  ("/ItalicAngle" . ,(conv-dim (italic-angle t1fm)))
@@ -66,14 +70,17 @@
 	  ("/CapHeight" . ,(conv-dim (cap-height t1fm)))
 	  ("/XHeight" . ,(conv-dim (x-height t1fm)))
 	  ("/StemV" . ,10)
-	  ("/FontFile" . ,(make-instance 'indirect-object :content
-			     (make-instance 'pdf-stream
-				:content (binary-data t1fm)
-				:no-compression t
-				:dict-values `(("/Type" . "/Pages")
-					       ("/Length1" . ,(length1 t1fm))
-					       ("/Length2" . ,(length2 t1fm))
-					       ("/Length3" . ,(length3 t1fm)))))))))))
+          ;; When binary-data is not available, don't embded.
+          ,@(when (and embed (binary-data t1fm))
+              `(("/FontFile" . ,(make-instance 'indirect-object :content
+                                  (make-instance 'pdf-stream
+                                    :content (binary-data t1fm)
+                                    :no-compression t ;(not *compress-fonts*)
+                                    :dict-values `(;("/Type" . "/Pages") ;remove!
+                                                   ("/Length1" . ,(length1 t1fm))
+                                                   ("/Length2" . ,(length2 t1fm))
+                                                   ("/Length3" . ,(length3 t1fm))
+                                                   )))))))))))
 
 ;example of T1 font loading:
 #+nil
