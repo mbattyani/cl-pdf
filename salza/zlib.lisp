@@ -31,7 +31,7 @@
 ;;; NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ;;; SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;; 
-;;; $Id: zlib.lisp,v 1.4 2005/03/16 02:29:56 xach Exp $
+;;; $Id: zlib.lisp,v 1.15 2005/04/05 19:53:27 xach Exp $
 
 
 (in-package :salza)
@@ -42,32 +42,56 @@
 (defconstant +adler32-base+ 65521)
 
 (defun adler32 (adler-high adler-low buf start end)
-  (declare (type (unsigned-byte 16) adler-high adler-low)
-           (type (simple-array (unsigned-byte 8)) buf)
+  (declare (optimize (speed 3) (safety 0) (debug 0)
+                     #+lispworks (hcl:fixnum-safety 0))
            (type buffer-offset start end)
-           (optimize (speed 3) (safety 0)))
-  (let ((s1 adler-low)
-        (s2 adler-high))
-    (declare (type (unsigned-byte 32) s1 s2))
-    (dotimes (i (- end start) (values s2 s1))
-      (declare (fixnum i))
-      (setf s1 (mod (+ s1 (aref buf (+ start i))) +adler32-base+))
-      (setf s2 (mod (+ s2 s1) +adler32-base+)))))
+           (type fixnum adler-high adler-low)
+           (type octet-vector buf))
+  (cond ((> start end)
+         (error "Invalid start and end values (start must be <= end)"))
+        ((= start end)
+         (values adler-high adler-low))
+        (t
+         (let ((length (- end start))
+               (i 0)
+               (k 0)
+               (s1 adler-low)
+               (s2 adler-high))
+           (declare (type buffer-offset i k length)
+                    (type fixnum s1 s2))
+           (tagbody
+            loop
+              (setf k (min 16 length))
+              (decf length k)
+            sum
+              (setf s1 (+ (aref buf (+ start i)) s1))
+              (setf s2 (+ s1 s2))
+              (decf k)
+              (incf i)
+              (unless (zerop k)
+                (go sum))
+              (setf s1 (mod s1 +adler32-base+))
+              (setf s2 (mod s2 +adler32-base+))
+              (unless (zerop length)
+                (go loop)))
+           (values s2 s1)))))
 
 
 ;;; Conditions
 
 (define-condition zlib-buffer-full ()
-  ((buffer :initarg :buffer :reader zlib-buffer-full-buffer)
-   (zlib-stream :initarg :zlib-stream :reader zlib-buffer-full-zlib-stream))
-  (:documentation "This condition is signalled in a continuable error
-when the buffer backing the deflate-stream has reached the end. User code
-should handle this condition, do something appropriate with the
-buffer, and reset the zlib-stream position."))
+  ((zlib-stream :initarg :zlib-stream :reader zlib-buffer-full-zlib-stream))
+  (:documentation "When no callback is provided in MAKE-ZLIB-STREAM,
+this condition is signalled in a continuable error when the buffer
+backing the zlib-stream has reached the end. It is also called at the
+end of output in FINISH-ZLIB-STREAM. User code should handle this
+condition, do something appropriate with the buffer, and reset the
+zlib-stream position."))
 
 (defstruct (zlib-stream
-             (:constructor %make-zlib-stream (deflate-stream)))
+             (:constructor %make-zlib-stream (deflate-stream callback)))
   deflate-stream
+  callback
   (adler-high 0 :type (unsigned-byte 16))
   (adler-low 1 :type (unsigned-byte 16)))
 
@@ -109,38 +133,47 @@ LZ77 window size, minus eight (CINFO=7 indicates a 32K window size).")
     (deflate-write-byte cm+flags deflate-stream)))
 
 
-(defun make-zlib-stream (buffer &optional (start 0) (end (length buffer)))
+(defun default-callback (zlib-stream)
+  (cerror "Retry write"
+          'zlib-buffer-full
+          :zlib-stream zlib-stream))
+
+(defun make-zlib-stream (buffer &key (start 0) end callback)
   "Create and return a zlib-stream. START is the first offset in
-BUFFER to which compressed data is written; END is the offset after
-the last writable byte in BUFFER."
+BUFFER to which compressed data is written. END is the offset after
+the last writable byte in BUFFER (if not provided, the length of
+BUFFER is used). CALLBACK is a function to be called when BUFFER is
+full and when the zlib-stream is finished. If no callback is provided,
+a function that raises a continuable ZLIB-BUFFER-FULL error is used."
   (check-type buffer (simple-array octet))
-  (let* ((deflate-stream (make-deflate-stream buffer start end)))
+  (setf end (or end (length buffer)))
+  ;; XXX This seems a little silly, but it captures the binding of
+  ;; zlib-stream in the lambda
+  (let* ((zlib-stream nil)
+         (zlib-callback (or callback #'default-callback))
+         (deflate-callback (lambda (deflate-stream)
+                             (declare (ignore deflate-stream))
+                             (funcall zlib-callback zlib-stream)))
+         (deflate-stream (make-deflate-stream buffer
+                                              :pos start
+                                              :end end
+                                              :callback deflate-callback)))
+    (setf zlib-stream (%make-zlib-stream deflate-stream callback))
     (write-zlib-stream-header deflate-stream)
     (start-deflate-stream deflate-stream)
-    (%make-zlib-stream deflate-stream)))
+    zlib-stream))
 
 (defun zlib-write-sequence (sequence zlib-stream
                             &key (start 0) (end (length sequence)))
-  "Compress SEQUENCE and write them to ZLIB-STREAM. May signal a
-continuable error of type ZLIB-BUFFER-FULL."
+  "Compress SEQUENCE and write them to ZLIB-STREAM."
   (multiple-value-bind (adler-high adler-low)
       (adler32 (zlib-stream-adler-high zlib-stream)
                (zlib-stream-adler-low zlib-stream)
                sequence start end)
     (setf (zlib-stream-adler-high zlib-stream) adler-high
           (zlib-stream-adler-low zlib-stream) adler-low)
-    (let ((deflate-stream (zlib-stream-deflate-stream zlib-stream)))
-      (handler-bind
-          ((deflate-stream-buffer-full
-            (lambda (c)
-              (declare (ignore c))
-              (cerror "Retry write"
-                      'zlib-buffer-full
-                      :zlib-stream zlib-stream
-                      :buffer (deflate-stream-buffer deflate-stream))
-              (continue))))
-        (deflate-write-sequence sequence deflate-stream
-          :start start :end end)))))
+    (deflate-write-sequence sequence (zlib-stream-deflate-stream zlib-stream)
+                            :start start :end end)))
 
 (defun zlib-write-string (string zlib-stream)
   "Write the octet representation of STRING to ZLIB-STREAM."
@@ -149,58 +182,63 @@ continuable error of type ZLIB-BUFFER-FULL."
 (defun finish-zlib-stream (zlib-stream)
   "Conclude output to the zlib-stream, writing the terminating code
 for the block to the buffer and and appending the four adler32
-checksum bytes. May signal a continuable error of type
-ZLIB-BUFFER-FULL."
+checksum bytes. Call ZLIB-STREAM's callback as the final step."
   (let ((deflate-stream (zlib-stream-deflate-stream zlib-stream)))
-    (handler-bind
-        ((deflate-stream-buffer-full
-          (lambda (c)
-            (declare (ignore c))
-            (cerror "Retry write"
-                    'zlib-buffer-full
-                    :zlib-stream zlib-stream
-                    :buffer (deflate-stream-buffer deflate-stream))
-            (continue))))
-      (finish-deflate-stream deflate-stream)
-      (let ((high (zlib-stream-adler-high zlib-stream))
-            (low (zlib-stream-adler-low zlib-stream)))
-        (deflate-write-byte (ldb (byte 8 8) high) deflate-stream)
-        (deflate-write-byte (ldb (byte 8 0) high) deflate-stream)
-        (deflate-write-byte (ldb (byte 8 8) low) deflate-stream)
-        (deflate-write-byte (ldb (byte 8 0) low) deflate-stream)))))
-
+    (finish-deflate-stream deflate-stream)
+    (let ((high (zlib-stream-adler-high zlib-stream))
+          (low (zlib-stream-adler-low zlib-stream)))
+      (deflate-write-byte (ldb (byte 8 8) high) deflate-stream)
+      (deflate-write-byte (ldb (byte 8 0) high) deflate-stream)
+      (deflate-write-byte (ldb (byte 8 8) low) deflate-stream)
+      (deflate-write-byte (ldb (byte 8 0) low) deflate-stream)
+      (funcall (zlib-stream-callback zlib-stream) zlib-stream))))
 
 
 
 ;;; Convenience functions
 
-(defun compress (input)
+(defun compress-sequence (input)
   "Return an octet sequence containing the bytes of INPUT compressed
 to the zlib format."
-  (check-type input (simple-array (unsigned-byte 8)))
-  (let* ((max-size (+ 12 (ceiling (* (length input) 1.01))))
-	 (buffer-size (min 8192 max-size))
-         (buffer (make-array buffer-size :element-type 'octet))
-         (zlib-stream (make-zlib-stream buffer))
-         (output-end 0)
-         (output (make-array max-size :adjustable nil :initial-element 0 :element-type 'octet)))
-    (flet ((flush-output-buffer (&optional c)
-             (declare (ignore c))
-	     (replace output buffer
-		      :start1 output-end
-		      :end2 (zlib-stream-position zlib-stream))
-             (incf output-end (zlib-stream-position zlib-stream))
-             (setf (zlib-stream-position zlib-stream) 0)
-             (continue)))
-      (handler-bind
-          ((zlib-buffer-full #'flush-output-buffer))
+  (check-type input octet-vector)
+  (let* ((buffer-size 8192)
+         (zlib-buffer (make-array buffer-size :element-type 'octet))
+         (offset 0)
+         (output (make-array buffer-size :adjustable t :initial-element 0)))
+    (flet ((zlib-callback (zlib-stream)
+             (let ((pos (zlib-stream-position zlib-stream)))
+               (adjust-array output (+ offset pos))
+               (replace output (zlib-stream-buffer zlib-stream)
+                        :start1 offset
+                        :end2 pos)
+               (incf offset pos)
+               (setf (zlib-stream-position zlib-stream) 0))))
+      (let ((zlib-stream (make-zlib-stream zlib-buffer
+                                           :callback #'zlib-callback)))
         (zlib-write-sequence input zlib-stream)
         (finish-zlib-stream zlib-stream)
-        (flush-output-buffer)
-        (subseq output 0 output-end)))))
+        output))))
 
 (defun compress-string (string)
   "Return the zlib compressed sequence of STRING's octet sequence
 representation."
-  (compress (deflate::string-to-octets string 0 (length string))))
+  (compress-sequence (deflate::string-to-octets string 0 (length string))))
 
+(defun compress-stream (input output)
+  "Read input from the stream INPUT and write it in ZLIB format to the
+stream OUTPUT. Both streams must have element-types of '(unsigned-byte
+8)."
+  (flet ((flush-stream (zlib-stream)
+           (write-sequence (zlib-stream-buffer zlib-stream) output
+                           :end (zlib-stream-position zlib-stream))
+           (setf (zlib-stream-position zlib-stream) 0)))
+    (let* ((input-buffer (make-array 8192 :element-type 'octet))
+           (output-buffer (make-array 8192 :element-type 'octet))
+           (zlib-stream (make-zlib-stream output-buffer
+                                          :callback #'flush-stream)))
+      (loop
+       (let ((end (read-sequence input-buffer input)))
+         (zlib-write-sequence input-buffer zlib-stream :end end)
+         (when (zerop end)
+           (finish-zlib-stream zlib-stream)
+           (return)))))))

@@ -29,7 +29,7 @@
 ;;; NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ;;; SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;; 
-;;; $Id: salza.asd,v 1.2 2005/03/16 02:29:56 xach Exp $
+;;; $Id: salza.asd,v 1.4 2005/03/20 04:54:55 xach Exp $
 
 (defpackage :salza-system
   (:use :cl :asdf))
@@ -37,7 +37,9 @@
 (in-package :salza-system)
 
 (defsystem :salza
-  :components ((:file "packages")
+  :components ((:file "fixhash")
+               (:file "packages"
+                      :depends-on ("fixhash"))
                (:file "types"
                       :depends-on ("packages"))
                (:file "deflate-stream"
@@ -47,11 +49,14 @@
                       :depends-on ("packages"
                                    "types"
                                    "deflate-stream"))
+               (:file "octet-replace"
+                      :depends-on ("packages"))
                (:file "compressor"
                       :depends-on ("packages"
                                    "types"
                                    "deflate-stream"
-                                   "huffman"))
+                                   "huffman"
+                                   "octet-replace"))
                (:file "deflate-stream-interface"
                       :depends-on ("packages"
                                    "compressor"

@@ -1,14 +1,14 @@
 ;;;; -*- Mode: LISP; Syntax: ANSI-Common-Lisp; Base: 10 -*-
 
-;;; cl-pdf copyright 2002-2003 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
 (in-package asdf)
 
 ;;;Choose the zlib implementation you want to use (only one!)
+(pushnew :use-salza-zlib cl:*features*)
 ;(pushnew :use-uffi-zlib cl:*features*)
-;(pushnew :use-salza-zlib cl:*features*)
 ;(pushnew :use-abcl-zlib cl:*features*)
 ;(pushnew :use-no-zlib cl:*features*)
 

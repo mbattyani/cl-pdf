@@ -1,14 +1,14 @@
-;;; cl-pdf copyright 2002-2003 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
 (in-package pdf)
 
-;Adapted from an UFFI example
+;;; UFFI zlib
 
+#+use-uffi-zlib
 (defun load-zlib (&optional force)
   (when force (setf *zlib-loaded* nil))
-  #+uffi
   (unless *zlib-loaded*
     (let ((zlib-path (find-zlib-path)))
       (if zlib-path
@@ -29,9 +29,7 @@
 	    (warn "Unable to load zlib. Disabling compression.")
 	    (setf *compress-streams* nil))))))
 
-(load-zlib)
-
-#+uffi
+#+use-uffi-zlib
 (defun compress-string (source)
   "Returns two values: array of bytes containing the compressed data
  and the numbe of compressed bytes"
@@ -56,11 +54,17 @@
 	    (uffi:free-foreign-object destlen)
 	    (uffi:free-foreign-object dest)))))))
 
-#+abcl
-(defun compress-string (i-string)
-  (let* ((i-string-bytes
+;;; ABCL zlib
+
+#+use-abcl-zlib
+(defun load-zlib (&optional force)
+  (setf *compress-streams* t))
+
+#+use-abcl-zlib
+(defun compress-string (string)
+  (let* ((string-bytes
 	  (java:jcall
-	   (java:jmethod "java.lang.String" "getBytes" "java.lang.String") i-string "UTF-8"))
+	   (java:jmethod "java.lang.String" "getBytes" "java.lang.String") string "UTF-8"))
 	 (out-array (java:jnew (java:jconstructor "java.io.ByteArrayOutputStream")))
 	 (compresser (java:jnew (java:jconstructor "java.util.zip.Deflater" "int")
 				(java:jfield "java.util.zip.Deflater" "BEST_COMPRESSION")))
@@ -69,61 +73,41 @@
 	   (java:jconstructor
 	    "java.util.zip.DeflaterOutputStream" "java.io.OutputStream" "java.util.zip.Deflater")
 	   out-array compresser)))
-    (java:jcall (java:jmethod "java.util.zip.Deflater" "setInput" "[B") compresser i-string-bytes)
+    (java:jcall (java:jmethod "java.util.zip.Deflater" "setInput" "[B") compresser string-bytes)
       (java:jcall (java:jmethod "java.util.zip.DeflaterOutputStream" "close") defl-out-stream)
       (java:jcall (java:jmethod "java.io.ByteArrayOutputStream" "toString") out-array)))
 
-#+abcl
-(setf *compress-streams* t)
+;;; salza zlib
 
-#|
-Unfinished Work!
-Using compression by block to avoid the huge cstring allocation of compress.
-If somebody has some time to finish it...
+#+use-salza-zlib
+(defun load-zlib (&optional force)
+  (setf *compress-streams* t))
 
-(uffi:def-struct zstream
-  (next-in (* :unsigned-char))
-  (avail-in :unsigned-int)
-  (total-in :unsigned-long)
-  (next-out (* :unsigned-char))
-  (avail-out :unsigned-int)
-  (total-out :unsigned-long)
-  (msg (* :unsigned-char))
-  (state :long)
-  (zalloc :long)
-  (zfree :long)
-  (opaque :long)
-  (data-type :int)
-  (alder :unsigned-long)
-  (reserved :unsigned-long))
+#+use-salza-zlib
+(defun compress-string (string)
+  (let* ((input (deflate::string-to-octets string 0 (length string)))
+	 (buffer-size (min 8192 (* 2 (length string))))
+         (zlib-buffer (make-array buffer-size :element-type 'salza::octet))
+         (chunks ()))
+    (flet ((zlib-callback (zlib-stream)
+	     (push (subseq (salza::zlib-stream-buffer zlib-stream) 
+			   0 (salza::zlib-stream-position zlib-stream)) chunks)
+	     (setf (salza::zlib-stream-position zlib-stream) 0)))
+      (let ((zlib-stream (salza::make-zlib-stream zlib-buffer :callback #'zlib-callback)))
+        (salza::zlib-write-sequence input zlib-stream)
+        (salza::finish-zlib-stream zlib-stream)
+	(nreverse chunks)))))
 
-(defconstant +z-no-compression+ 0)
-(defconstant +z-best-speed+ 1)
-(defconstant +z-best-compression+ 9)
-(defconstant +z-default-compression+ -1)
+;;; no-zlib
+#+use-no-zlib
+(defun load-zlib (&optional force)
+  (setf *compress-streams* nil))
 
-(uffi:def-function ("deflateInit" deflate-init)
-    ((stream (* (:struct zstream)))
-     (level :int))
-  :returning :int
-  :module "zlib")
+#+use-no-zlib
+(defun compress-string (string)
+  string)
 
-(defconstant +z-no-flush+ 0)
-(defconstant +z-sync-flush+ 2)
-(defconstant +z-full-flush+ 3)
-(defconstant +z-finish+ 4)
+;;; load it!
 
-(uffi:def-function ("deflate" deflate)
-    ((stream (* (:struct zstream)))
-     (flush :int))
-  :returning :int
-  :module "zlib")
+(load-zlib)
 
-(uffi:def-function ("deflateEnd" deflate-end)
-    ((stream (* (:struct zstream))))
-  :returning :int
-  :module "zlib")
-
-(defvar *z-block-size* 4096)
-
-|#

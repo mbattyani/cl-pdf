@@ -45,6 +45,16 @@
   (unless empty
     (add-dict-value obj "/Length" #'(lambda () (length (content obj))))))
 
+(defun compress-pdf-stream (pdf-stream)
+  (when (and *compress-streams* (not (no-compression pdf-stream))
+	     (> (length (content pdf-stream)) *min-size-for-compression*))
+    (setf (content pdf-stream) (compress-string (content pdf-stream)))
+    (let ((filter (get-dict-value pdf-stream "/Filter")))
+      (if filter
+	  (change-dict-value pdf-stream "/Filter" (vector "/FlateDecode" filter))
+	  (add-dict-value pdf-stream "/Filter" "/FlateDecode")))
+    (setf (no-compression pdf-stream) t)))
+
 (defclass document ()
   ((objects :accessor objects :initform nil)
    (root-page :accessor root-page :initform nil)
@@ -396,24 +406,25 @@
 	(write-char #\Newline *pdf-stream*))
   (write-line " >>" *pdf-stream*))
 
+(defmethod write-stream-content ((obj string))
+  (write-sequence obj *pdf-stream*))
+
+(defmethod write-stream-content ((obj sequence))
+  #+pdf-binary
+  (write-sequence obj *pdf-stream*)
+  #-pdf-binary
+  (loop for c across obj do
+	(write-char (code-char c) *pdf-stream*)))
+
+(defmethod write-stream-content ((obj list))
+  (map nil 'write-stream-content obj))
+
 (defmethod write-object ((obj pdf-stream) &optional root-level)
   (declare (ignorable root-level))
-  (when (and *compress-streams* (not (no-compression obj))
-	     (> (length (content obj)) *min-size-for-compression*))
-    (setf (content obj) (compress-string (content obj)))
-    (let ((filter (get-dict-value obj "/Filter")))
-      (if filter
-	  (change-dict-value obj "/Filter" (vector "/FlateDecode" filter))
-	  (add-dict-value obj "/Filter" "/FlateDecode"))))
+  (compress-pdf-stream obj)
   (call-next-method)
   (write-line "stream" *pdf-stream*)
-  #+pdf-binary
-  (write-sequence (content obj) *pdf-stream*)
-  #-pdf-binary
-  (if (stringp (content obj))
-      (write-sequence (content obj) *pdf-stream*)
-      (loop for c across (content obj) do
-	(write-char (code-char c) *pdf-stream*)))
+  (write-stream-content (content obj))
   (write-char #\Newline *pdf-stream*)
   (write-line "endstream" *pdf-stream*))
 

@@ -32,7 +32,7 @@
 ;;; NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ;;; SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;;
-;;; $Id: deflate-stream.lisp,v 1.2 2005/03/16 02:29:56 xach Exp $
+;;; $Id: deflate-stream.lisp,v 1.11 2005/04/01 21:57:24 xach Exp $
 
 (in-package :salza-deflate)
 
@@ -49,8 +49,9 @@
 
 (defstruct (deflate-stream
              (:constructor
-              make-deflate-stream (buffer &optional (pos 0) (end (length buffer)))))
-  buffer
+              %make-deflate-stream (buffer pos end callback)))
+  (buffer nil :type (or octet-vector null))
+  (callback nil :type (or function null))
   (pos 0 :type buffer-offset)
   (end 0 :type buffer-offset)
   (byte 0 :type octet)
@@ -58,8 +59,18 @@
   (compress-buffer (make-array *compressor-buffer-size* :element-type 'octet)
                    :type (simple-array octet))
   (compress-pos 0 :type buffer-offset)
-  (compress-positions (make-hash-table) :type hash-table))
+  (compress-positions (make-fixhash-table)))
 
+(defun default-callback (deflate-stream)
+  (cerror "Resume output"
+          'deflate-stream-buffer-full
+          :deflate-stream deflate-stream))
+
+(defun make-deflate-stream (buffer
+                            &key (pos 0) end (callback #'default-callback))
+  (check-type buffer octet-vector)
+  (setf end (or end (length buffer)))
+  (%make-deflate-stream buffer pos end callback))
 
 (defmethod print-object ((object deflate-stream) stream)
   (print-unreadable-object (object stream :type t :identity t)
@@ -68,7 +79,7 @@
             (deflate-stream-end object)
             (deflate-stream-byte object)
             (deflate-stream-bits-left object))))
-            
+
 (defun write-bits (code length deflate-stream)
   "Save LENGTH low bits of CODE to the buffer of DEFLATE-STREAM. If the end
 of the deflate-stream buffer is reached, raise a continuable error of type
@@ -76,31 +87,33 @@ DEFLATE-STREAM-BUFFER-FULL."
   (declare (type (unsigned-byte 24) code)
            (type (integer 0 24) length)
            (type deflate-stream deflate-stream)
-           (optimize (speed 3) (safety 0)))
-  (symbol-macrolet
-      ((byte (deflate-stream-byte deflate-stream))
-       (bits-left (deflate-stream-bits-left deflate-stream))
-       (pos (deflate-stream-pos deflate-stream))
-       (buffer (deflate-stream-buffer deflate-stream))
-       (end (deflate-stream-end deflate-stream)))
-    (declare (type (simple-array octet) buffer)
+           (optimize (speed 3) (safety 0) (debug 0)))
+  (let ((byte (deflate-stream-byte deflate-stream))
+        (bits-left (deflate-stream-bits-left deflate-stream))
+        (pos (deflate-stream-pos deflate-stream))
+        (buffer (deflate-stream-buffer deflate-stream))
+        (end (deflate-stream-end deflate-stream)))
+    (declare (type octet-vector buffer)
              (type (integer 0 8) bits-left)
+             (type (integer 0 255) byte)
              (type buffer-offset pos end))
     (flet ((output-byte ()
              (setf (aref buffer pos) byte)
              (incf pos)
              (loop
               (when (< pos end) (return))
-               (cerror "Resume output"
-                       'deflate-stream-buffer-full
-                       :deflate-stream deflate-stream))))
+              (setf (deflate-stream-pos deflate-stream) pos)
+              (funcall (the function (deflate-stream-callback deflate-stream))
+                       deflate-stream)
+              (setf buffer (deflate-stream-buffer deflate-stream)
+                    pos (deflate-stream-pos deflate-stream)))))
+      (declare (inline output-byte))
       (tagbody
        loop
          (cond ((> length bits-left)
                 (setf byte
                       (logior byte
-                              (ash (ldb (byte bits-left 0) code)
-                                   (- 8 bits-left))))
+                              (logand #xFF (ash code (- 8 bits-left)))))
                 (output-byte)
                 (decf length bits-left)
                 (setf code (ash code (- bits-left)))
@@ -109,16 +122,16 @@ DEFLATE-STREAM-BUFFER-FULL."
                 (go loop))
                ((= length bits-left)
                 (setf byte (logior byte
-                                   (ash (ldb (byte bits-left 0) code)
-                                        (- 8 bits-left))))
+                                   (logand #xFF (ash code (- 8 bits-left)))))
                 (output-byte)
                 (setf bits-left 8
                       byte 0))
                (t
-                (setf byte (logior byte (ash code (- 8 bits-left))))
+                (setf byte (logior byte (logand #xFF (ash code (- 8 bits-left)))))
                 (decf bits-left length))))
       (setf (deflate-stream-bits-left deflate-stream) bits-left
-            (deflate-stream-byte deflate-stream) byte))))
+            (deflate-stream-byte deflate-stream) byte
+            (deflate-stream-pos deflate-stream) pos))))
 
 (defconstant +deflate-fixed-tables-code+ #b01)
 
@@ -137,4 +150,9 @@ advance the stream position."
           (deflate-stream-byte deflate-stream))
     (setf (deflate-stream-byte deflate-stream) 0
           (deflate-stream-bits-left deflate-stream) 8)
-    (incf (deflate-stream-pos deflate-stream))))
+    (incf (deflate-stream-pos deflate-stream))
+    (loop
+     (when (< (deflate-stream-pos deflate-stream)
+              (deflate-stream-end deflate-stream))
+       (return)))))
+

@@ -29,21 +29,23 @@
 ;;; NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ;;; SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;; 
-;;; $Id: packages.lisp,v 1.4 2005/03/16 02:29:56 xach Exp $
+;;; $Id: packages.lisp,v 1.9 2005/03/25 21:09:02 xach Exp $
 
 (in-package :cl)
 
 (defpackage :salza-types
   (:use :cl)
   (:export :octet
+           :octet-vector
            :buffer-offset))
   
 (defpackage :salza-deflate
-  (:use :cl :salza-types)
+  (:use :cl :salza-types :fixhash)
   (:nicknames :deflate)
   (:export :make-deflate-stream
            :deflate-stream-buffer
            :deflate-stream-pos
+           :deflate-stream-callback
 
            :start-deflate-stream
            :deflate-write-byte
@@ -64,10 +66,16 @@
   (:export :make-zlib-stream
            :zlib-write-sequence
            :zlib-write-string
-           :compress
-           :compress-string
+           :zlib-stream-buffer
+           :zlib-stream-position
+           :zlib-stream-callback
            :finish-zlib-stream
+
+           :compress-sequence
+           :compress-string
+           :compess-stream
+
            :zlib-buffer-full
-           :zlib-buffer-full-buffer
-           :zlib-stream-position))
+           :zlib-buffer-full-zlib-stream))
+
 

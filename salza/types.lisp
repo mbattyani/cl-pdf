@@ -29,7 +29,7 @@
 ;;; NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ;;; SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;; 
-;;; $Id: types.lisp,v 1.2 2005/03/16 02:29:56 xach Exp $
+;;; $Id: types.lisp,v 1.4 2005/04/01 22:09:58 xach Exp $
 
 (in-package :salza-types)
 
@@ -37,4 +37,7 @@
   '(unsigned-byte 8))
 
 (deftype buffer-offset ()
-  '(integer 0 #.array-total-size-limit))
+  '(integer 0 #.(1- array-dimension-limit)))
+
+(deftype octet-vector ()
+  '(simple-array octet (*)))

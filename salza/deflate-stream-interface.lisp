@@ -29,7 +29,7 @@
 ;;; NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ;;; SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;; 
-;;; $Id: deflate-stream-interface.lisp,v 1.3 2005/03/16 02:29:56 xach Exp $
+;;; $Id: deflate-stream-interface.lisp,v 1.10 2005/03/23 19:55:20 xach Exp $
 
 (in-package :salza-deflate)
 
@@ -45,7 +45,9 @@
 buffer and add the end-of-block code."
   (finish-compress deflate-stream)
   (write-literal #x100 deflate-stream)
-  (flush-deflate-stream deflate-stream))
+  (flush-deflate-stream deflate-stream)
+  (funcall (deflate-stream-callback deflate-stream)
+           deflate-stream))
 
 (defun deflate-write-sequence (sequence deflate-stream
                                &key (start 0) (end (length sequence)))
@@ -64,6 +66,9 @@ next octet to DEFLATE-STREAM."
 
 (defun string-to-octets (string start end)
   "Convert STRING to a sequence of octets, if possible."
+  (declare (type string string)
+           (type buffer-offset start end)
+           (optimize (speed 3) (safety 0)))
   #+(and sbcl (not octet-characters))
   (sb-ext:string-to-octets string :start start :end end)
   #+(and allegro (not octet-characters))
@@ -73,9 +78,9 @@ next octet to DEFLATE-STREAM."
   #+(or octet-characters lispworks)
   (let* ((length (- end start))
          (result (make-array length :element-type 'octet)))
-    (loop for i from start below end
-          for j from 0
-          do (setf (aref result j) (char-code (char string i))))
+    (loop for i fixnum from start below end
+          for j fixnum from 0
+          do (setf (aref result j) (char-code (aref string i))))
     result)
   #+(and (not octet-characters) (not (or sbcl allegro clisp lispworks)))
   (error "Do not know how to convert a string to octets."))
@@ -87,46 +92,52 @@ next octet to DEFLATE-STREAM."
 
 ;;; CRC32
 
-
 (defun crc32-table ()
   (declare (optimize (speed 3) (safety 0)))
-  (let ((table (make-array 256 :element-type '(unsigned-byte 32))))
+  (let ((table (make-array 512 :element-type '(unsigned-byte 16))))
     (dotimes (n 256 table)
       (let ((c n))
-        (declare (type (integer 0 #xFFFFFFFF) c))
+        (declare (type (unsigned-byte 32) c))
         (dotimes (k 8)
           (if (logbitp 0 c)
               (setf c (logxor #xEDB88320 (ash c -1)))
               (setf c (ash c -1)))
-          (setf (aref table n) c))))))
+          (setf (aref table (ash n 1)) (ldb (byte 16 16) c)
+                (aref table (1+ (ash n 1))) (ldb (byte 16 0) c)))))))
 
-(defvar *crc32-table* (crc32-table))
+(let ((table (crc32-table)))
+  (defun crc32 (high low buf end)
+    (declare (optimize (speed 3) (safety 0) #+lispworks (hcl:fixnum-safety 0))
+             (type (unsigned-byte 16) high low)
+             (type octet-vector buf)
+             (type (simple-array (unsigned-byte 16) (*)) table)
+             (fixnum end))
+    (let ((len end))
+      (declare (fixnum len))
+      (dotimes (n len (values high low))
+        (declare (fixnum n))
+        (let ((index (logxor (logand low #xFF) (aref buf n))))
+          (declare (type (integer 0 255) index))
+          (let ((high-index (ash index 1))
+                (low-index (1+ (ash index 1))))
+            (declare (type (integer 0 511) high-index low-index))
+            (let ((t-high (aref table high-index))
+                  (t-low (aref table low-index)))
+              (declare (type (unsigned-byte 16) t-high t-low))
+              (setf low (logxor (ash (logand high #xFF) 8)
+                                (ash low -8)
+                                t-low))
+              (setf high (logxor (ash high -8) t-high)))))))))
 
-
-(defun crc32 (high low buf &key (end (length buf)))
-  (declare (type (simple-array (unsigned-byte 8) (*)) buf)
-           (type (simple-array (unsigned-byte 32) (255)) *crc32-table*)
-           (type (unsigned-byte 16) high low)
-           (optimize (speed 3) (safety 0)))
-  (let ((c (logior (ash high 16) low))
-        (len end))
-    (declare (type (unsigned-byte 32) c)
-             (type (integer 0 #.array-total-size-limit) len))
-    (dotimes (n len (values (ldb (byte 16 16) c)
-                            (ldb (byte 16 0) c)))
-      (setf c
-            (logxor (aref *crc32-table*
-                          (logand (logxor c (aref buf n)) #xFF))
-                    (ash c -8))))))
 
 (defun crc32-sequence (sequence &key (end (length sequence)))
-  "Return an (unsigned-byte 8) sequence of four bytes containing the
+  "Return an octet sequence of four bytes containing the
 crc32 checksum of SEQUENCE."
   (multiple-value-bind (high low)
-      (crc32 #xFFFF #xFFFF sequence :end end)
+      (crc32 #xFFFF #xFFFF sequence end)
     (setf high (logxor #xFFFF high)
           low (logxor #xFFFF low))
-    (make-array 4 :element-type '(unsigned-byte 8)
+    (make-array 4 :element-type 'octet
                 :initial-contents (list (ldb (byte 8 8) high)
                                         (ldb (byte 8 0) high)
                                         (ldb (byte 8 8) low)
