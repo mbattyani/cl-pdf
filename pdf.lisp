@@ -497,9 +497,8 @@
 (defmethod write-document ((filename string) &optional (document *document*))
   (write-document (pathname filename) document))
 
-(defmacro with-document ((&rest args &key (max-number-of-pages '*max-number-of-pages*))
+(defmacro with-document ((&rest args &key (max-number-of-pages '*max-number-of-pages*) &allow-other-keys)
 			 &body body)
-  
   `(let* ((*document* (make-instance 'document ,@args))
 	  (*outlines-stack* (list (outline-root *document*)))
 	  (*root-page* (root-page *document*))
