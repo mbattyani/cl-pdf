@@ -41,7 +41,7 @@
     (setf (subseq binary-data length1 (+ length1 length2))
 	  (subseq data start2 (+ start2 length2)))
     (setf (subseq binary-data (+ length1 length2)(+ length1 length2 length3))
-	  (subseq data start2 (+ start3 length3)))
+	  (subseq data start3 (+ start3 length3)))
     (setf (binary-data t1fm) binary-data
 	  (length1 t1fm) length1
 	  (length2 t1fm) length2
