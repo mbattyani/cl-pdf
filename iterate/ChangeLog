@@ -2,6 +2,145 @@
 # arch-tag: automatic-ChangeLog--asf@boinkor.net--2003p/iterate--main--1.0
 #
 
+2004-05-30 15:18:08 GMT	Andreas Fuchs <asf@boinkor.net>	patch-17
+
+    Summary:
+      Add most examples from iter-man to the test suite; fix resulting bugs
+    Revision:
+      iterate--main--1.0--patch-17
+
+     * added the useful examples from the manual into the test suite
+     
+     * added a synonym for COUNT->COUNTING
+    
+     * Fix the manual for defclause-sequence
+
+    new files:
+     doc/auto/iter-man.el
+
+    modified files:
+     ChangeLog doc/iter-man.tex iterate-test.lisp iterate.lisp
+
+    new directories:
+     doc/auto
+
+
+2004-05-30 14:09:31 GMT	Andreas Fuchs <asf@boinkor.net>	patch-16
+
+    Summary:
+      fix the readme, /again/!
+    Revision:
+      iterate--main--1.0--patch-16
+
+    fix the readme, /again/!
+    
+
+    modified files:
+     ChangeLog README
+
+
+2004-05-30 14:05:32 GMT	Andreas Fuchs <asf@boinkor.net>	patch-15
+
+    Summary:
+      update docs once again
+    Revision:
+      iterate--main--1.0--patch-15
+
+    update docs once again
+    
+
+    modified files:
+     BUGS ChangeLog README
+
+
+2004-05-30 13:57:00 GMT	Andreas Fuchs <asf@boinkor.net>	patch-14
+
+    Summary:
+      Add BUGS file
+    Revision:
+      iterate--main--1.0--patch-14
+
+    Add BUGS file
+    
+
+    new files:
+     BUGS
+
+    modified files:
+     ChangeLog
+
+
+2004-05-30 13:52:23 GMT	Andreas Fuchs <asf@boinkor.net>	patch-13
+
+    Summary:
+      Fix the test cases for synonyms
+    Revision:
+      iterate--main--1.0--patch-13
+
+
+    modified files:
+     ChangeLog iterate-test.lisp
+
+
+2004-05-30 10:30:15 GMT	Andreas Fuchs <asf@boinkor.net>	patch-12
+
+    Summary:
+      Fixed up synonyms
+    Revision:
+      iterate--main--1.0--patch-12
+
+
+    modified files:
+     ChangeLog iterate-test.lisp iterate.lisp
+
+
+2004-05-30 09:46:48 GMT	Andreas Fuchs <asf@boinkor.net>	patch-11
+
+    Summary:
+      improve README a bit
+    Revision:
+      iterate--main--1.0--patch-11
+
+    improve README a bit
+    
+
+    modified files:
+     ChangeLog README
+
+
+2004-05-30 09:35:25 GMT	Andreas Fuchs <asf@boinkor.net>	patch-10
+
+    Summary:
+      added a more useful README
+    Revision:
+      iterate--main--1.0--patch-10
+
+    added a more useful README
+    
+
+    modified files:
+     ChangeLog README
+
+
+2004-05-11 16:07:25 GMT	Andreas Fuchs <asf@boinkor.net>	patch-9
+
+    Summary:
+      update the special form walker
+    Revision:
+      iterate--main--1.0--patch-9
+
+    We were spuriously warning for special operators that required no
+    special treatment.
+    
+    Now, we only warn if we really don't know about the form.
+    
+    Also, teach iterate about special ops symbol-macrolet and
+    load-time-value.
+
+    modified files:
+     ChangeLog iterate.lisp
+
+
 2004-04-27 11:15:35 GMT	Andreas Fuchs <asf@boinkor.net>	patch-8
 
     Summary:

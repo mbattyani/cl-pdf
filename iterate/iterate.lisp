@@ -298,6 +298,7 @@
     (let . 		   walk-let)
     (let* . 		   walk-let)
     (macrolet . 	   walk-macrolet)
+    (symbol-macrolet . 	   walk-symbol-macrolet)
     (multiple-value-bind . walk-multiple-value-bind)
     (multiple-value-call . walk-cdr)
     (multiple-value-prog1. walk-cdr)
@@ -309,7 +310,8 @@
     (tagbody . 		   walk-cdr)
     (the . 		   walk-cddr)
     (throw . 		   walk-cdr) 
-    (unwind-protect . 	   walk-cdr)))
+    (unwind-protect . 	   walk-cdr)
+    (load-time-value .     nil)))
 
 
 ;;; For clauses that are "special" in the sense that they don't conform to the
@@ -726,17 +728,21 @@
       (assoc symbol *special-form-alist*)))
 
 (defun walk-special-form (form)
-  (let ((*clause* form)
-	(func (cdr (assoc (car form) *special-form-alist*))))
+  (let* ((*clause* form)
+	 (func-p (assoc (car form) *special-form-alist*))
+	 (func (cdr func-p)))
     (declare (optimize (speed 0)))
-    (if (null func)
-	(progn
-	  (warn "~<Unknown special form ~A. The lisp environment ~
-                  claims that ~A is a special operator, but ~
-                  ITERATE doesn't know how to handle it.~>"
-		(car form) (car form))
-	  (list form))
-	(apply func form))))
+    (cond
+      ((null func-p)  ; we don't know anything about the alleged special form
+       (warn "~<Unknown special form ~A. The lisp environment ~
+                claims that ~A is a special operator, but ~
+                ITERATE doesn't know how to handle it.~>"
+	     (car form) (car form))
+       (list form))
+      ((null func)    ; we know about it, but there's nothing to do
+       (list form))
+      (t
+	(apply func form)))))
 
 (defun walk-cdr (first &rest stuff)
   ;; This is for anything where only the car isn't to be walked.
@@ -902,13 +908,16 @@ binding context like let or multiple-value-bind.")))
 
 
 (defun walk-macrolet (&rest stuff)
-  (macrolet-error stuff))
+  (macrolet-error stuff 'macrolet))
 
-(defun macrolet-error (stuff)
+(defun walk-symbol-macrolet (&rest stuff)
+  (macrolet-error stuff 'symbol-macrolet))
+
+(defun macrolet-error (stuff form-name)
   (declare (ignore stuff))
-  (error "~<Macrolet is not permitted inside Iterate. Please ~
-  refactor the iterate form (e.g. by using MACROLETs that wrap ~
-  the ITERATE form).~>"))
+  (error "~<~A is not permitted inside Iterate. Please ~
+  refactor the iterate form (e.g. by using ~As that wrap ~
+  the ITERATE form).~>" form-name form-name))
 
 
 (defun walk-cond (cond &rest stuff)
@@ -1000,7 +1009,7 @@ binding context like let or multiple-value-bind.")))
 
 
 (defun symbol-synonym (symbol)
-  (get symbol 'synonym) symbol)
+  (or (get symbol 'synonym) symbol))
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -2674,7 +2683,7 @@ access types." sym-types))
 			   `((if ,test ,update-code ,var))
 			   (list update-code)))))
 
-
+(defsynonym count counting)
 
 (defclause (COUNTING expr &optional INTO var)
   "Increment a variable if expression is non-nil"
