@@ -151,15 +151,18 @@
  (:method ((color vector))
   #+lispworks
   (case (aref color 0)		; convert from (color:make-rgb ...) or other model
+    ((numberp (aref color 0))	(values (aref color 0)(aref color 1)(aref color 2)))
     (:RGB	(values (aref color 1)(aref color 2)(aref color 3)))
-    (otherwise	(values (aref color 0)(aref color 1)(aref color 2))))
+    (:GRAY	(values (aref color 1)(aref color 1)(aref color 1))))
   #-lispworks
   (values (aref color 0)(aref color 1)(aref color 2)))
 
  (:method ((color string))	; takes a CSS color string like "#CCBBFF"
-  (values (/ (parse-integer color :start 1 :end 3 :radix 16) 255.0)
-	  (/ (parse-integer color :start 3 :end 5 :radix 16) 255.0)
-	  (/ (parse-integer color :start 5 :end 7 :radix 16) 255.0)))
+  (if (eql #\# (aref color 0))
+      (values (/ (parse-integer color :start 1 :end 3 :radix 16) 255.0)
+	      (/ (parse-integer color :start 3 :end 5 :radix 16) 255.0)
+	      (/ (parse-integer color :start 5 :end 7 :radix 16) 255.0))
+      (find-color-from-string color)))
 
  (:method ((color integer))	; a la CSS but specified as a Lisp number like #xCCBBFF
   (values (/ (ldb (byte 8 16) color) 255.0)
@@ -167,9 +170,7 @@
           (/ (ldb (byte 8 0) color) 255.0))) 
 
  (:method ((color symbol))	; :blue, :darkgreen, or win32:color_3dface
-  #+lispworks
-  (lw:when-let (color (color:get-color-spec color))
-    (get-rgb color))) )
+   (find-color-from-symbol color)))
 
 (defun set-color-stroke (color)
   (multiple-value-call #'set-rgb-stroke (get-rgb color)))

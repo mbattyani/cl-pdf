@@ -12,6 +12,7 @@ Lars Rustemeier (code128 barcodes)
 Madhu Suresh (T3 fonts)
 Carlos Ungil (plot-xy, Corman Lisp port)
 Gary Warren King (MCL port)
+Klaus Weidner (std color names)
 Edi Weitz (cmucl zlib)
 
 I apologize if I've missed someone. Please let me know if that's the case.
