@@ -50,6 +50,7 @@
    ))
 
 (defmethod initialize-instance :after ((axis value-axis) &rest init-options &key &allow-other-keys)
+  (declare (ignore init-options))
   (compute-scale axis))
 
 (defclass histo-axis (axis)
@@ -251,21 +252,23 @@
 
 (defmethod initialize-instance :after ((histo histogram) &rest init-options &key
 				       x-axis-options y-axis-options legend-options &allow-other-keys)
+  (declare (ignore init-options))
   (setf (y-axis histo)
 	(apply #'make-instance 'vertical-value-axis
 	       :x (x histo) :y (y histo) :height (height histo)
-	       :min-value (reduce #'min (mapcar #'(lambda (values)
-						    (reduce #'min values))
-						(series histo)))
-	       :max-value (reduce #'max (mapcar #'(lambda (values)
-						    (reduce #'max values))
-						(series histo)))
-	       y-axis-options))
+               (append y-axis-options
+                       (list
+                        :min-value (reduce #'min (mapcar #'(lambda (values)
+                                                             (reduce #'min values))
+                                                         (series histo)))
+                        :max-value (reduce #'max (mapcar #'(lambda (values)
+                                                             (reduce #'max values))
+                                                         (series histo)))))))
   (setf (x-axis histo)
 	(apply #'make-instance 'horizontal-histo-axis
-	       :x (x histo) :y (y histo) :width (width histo)
-	       :label-names (label-names histo)
-	       x-axis-options))
+               :x (x histo) :y (y histo) :width (width histo)
+               :label-names (label-names histo)
+               x-axis-options))
   (when (> (length (series histo)) 1)
     (setf (legend histo)
 	(apply #'make-instance 'legend
@@ -330,6 +333,7 @@
 
 (defmethod initialize-instance :after ((obj pie-chart) &rest init-options &key no-legend
 				       legend-options &allow-other-keys)
+  (declare (ignore init-options))
   (unless no-legend
     (setf (legend obj)
 	  (apply #'make-instance 'legend
@@ -411,38 +415,41 @@
 
 (defmethod initialize-instance :after ((plot plot-xy) &rest init-options &key
 				       x-axis-options y-axis-options legend-options &allow-other-keys)
+  (declare (ignore init-options))
   (setf (y-axis plot)
 	(apply #'make-instance 'vertical-value-axis
 	       :x (x plot) :y (y plot) :height (height plot)
-	       :min-value
-	       (reduce #'min
-		       (mapcar #'(lambda (values)
-				   (reduce #'min
-					   (mapcar #'second values)))
-			       (series plot)))
-	       :max-value
-	       (reduce #'max
-		       (mapcar #'(lambda (values)
-				   (reduce #'max
-					   (mapcar #'second values)))
-						(series plot)))
-	       y-axis-options))
+               (append y-axis-options
+                       (list
+			:min-value
+			(reduce #'min
+				(mapcar #'(lambda (values)
+					    (reduce #'min
+						    (mapcar #'second values)))
+					(series plot)))
+			:max-value
+			(reduce #'max
+				(mapcar #'(lambda (values)
+					    (reduce #'max
+						    (mapcar #'second values)))
+					(series plot)))))))
   (setf (x-axis plot)
 	(apply #'make-instance 'horizontal-value-axis
 	       :x (x plot) :y (y plot) :width (width plot)
-	       :min-value
-	       (reduce #'min
-		       (mapcar #'(lambda (values)
-				   (reduce #'min
-					   (mapcar #'first values)))
-			       (series plot)))
-	       :max-value
-	       (reduce #'max
-		       (mapcar #'(lambda (values)
-				   (reduce #'max
-					   (mapcar #'first values)))
-						(series plot)))
-	       x-axis-options))
+               (append x-axis-options
+                       (list
+			:min-value
+			(reduce #'min
+				(mapcar #'(lambda (values)
+					    (reduce #'min
+						    (mapcar #'first values)))
+					(series plot)))
+			:max-value
+			(reduce #'max
+				(mapcar #'(lambda (values)
+					    (reduce #'max
+						    (mapcar #'first values)))
+					(series plot)))))))
   (when (> (length (series plot)) 1)
     (setf (legend plot)
 	(apply #'make-instance 'legend

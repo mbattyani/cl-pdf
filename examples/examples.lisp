@@ -352,7 +352,7 @@
 				      ((1.3 12) (1.6 18) (2 16) (3 27)))
 			    :background-color '(0.9 0.9 0.9)
 			    :x-axis-options ()
-			    :y-axis-options ()
+			    :y-axis-options '(:min-value 0)
 			    :legend-options ()))))))
     (pdf:write-document file)))
 
