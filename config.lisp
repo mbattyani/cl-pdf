@@ -15,7 +15,7 @@
 
 (defvar *min-size-for-compression* 300)
 
-(defvar *compress-streams* t
+(defvar *compress-streams* nil
   "Enables the internal streams compression by zlib")
 
 ;; The *afm-files-directories* is only for the 14 predefined fonts.

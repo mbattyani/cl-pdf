@@ -6,7 +6,13 @@
 
 (in-package asdf)
 
-#+(or allegro lispworks cmu sbcl openmcl mcl scl)
+#-uffi
+(ignore-errors
+  (print "Trying to load UFFI:")
+  (asdf:operate 'asdf:load-op :uffi)
+  (pushnew :uffi cl:*features*)
+  (print "UFFI loaded."))
+
 (defsystem :cl-pdf
   :name "cl-pdf"
   :author "Marc Battyani <marc.battyani@fractalconcept.com>"
@@ -31,6 +37,4 @@
 	       (:file "pdf-geom" :depends-on ("pdf-base"))
 	       (:file "text" :depends-on ("pdf-base"))
 	       (:file "bar-codes" :depends-on ("pdf-geom"))
-	       (:file "chart" :depends-on ("text" "pdf-geom")))
-  :depends-on (:uffi)
-  )
+	       (:file "chart" :depends-on ("text" "pdf-geom"))))
