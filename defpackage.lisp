@@ -7,7 +7,8 @@
 (defpackage pdf
   (:use common-lisp)
   (:export
-   #:*compress-streams* #:*zlib-search-paths* #:*afm-files-directories* #:*default-encoding*
+   #:*compress-streams* #:*zlib-search-paths* #:*zlib-loaded* #:load-zlib
+   #:*afm-files-directories* #:*default-encoding*
    #:load-fonts #:get-font #:font #:clear-font-cache #:name #:encoding #:font-metrics #:add-font-to-page
    #:font-name #:full-name #:family-name #:weight #:font-bbox #:version #:notice #:encoding-scheme
    #:characters #:code #:width #:bbox #:kernings #:get-char #:get-char-width #:get-char-size

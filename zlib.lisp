@@ -6,16 +6,6 @@
 
 ;Adapted from an UFFI example
 
-#+zlib
-(uffi:def-function ("compress" c-compress)
-    ((dest (* :unsigned-char))
-     (destlen (* :long))
-     (source :cstring)
-     (source-len :long))
-    :returning :int
-    :module "zlib")
-
-#+zlib
 (defun compress-string (source)
   "Returns two values: array of bytes containing the compressed data
  and the numbe of compressed bytes"
@@ -66,7 +56,6 @@ If somebody has some time to finish it...
 (defconstant +z-best-compression+ 9)
 (defconstant +z-default-compression+ -1)
 
-#+zlib
 (uffi:def-function ("deflateInit" deflate-init)
     ((stream (* (:struct zstream)))
      (level :int))
@@ -78,14 +67,12 @@ If somebody has some time to finish it...
 (defconstant +z-full-flush+ 3)
 (defconstant +z-finish+ 4)
 
-#+zlib
 (uffi:def-function ("deflate" deflate)
     ((stream (* (:struct zstream)))
      (flush :int))
   :returning :int
   :module "zlib")
 
-#+zlib
 (uffi:def-function ("deflateEnd" deflate-end)
     ((stream (* (:struct zstream))))
   :returning :int
