@@ -15,7 +15,7 @@
    :drive-letters '("C" "D" "E")
    :types '("so" "a" "dll" "dylib"))))
 
-#+(and cmu uffi)
+#+(and uffi (or cmu sbcl))
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (let ((zlib-path (find-zlib-path)))
     (when zlib-path
