@@ -8,12 +8,16 @@
 
 #+uffi
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defun find-zlib-path ()
+(defun find-zlib-path* (name)
   (uffi:find-foreign-library
-   "libz"
+   name
    *zlib-search-paths*
    :drive-letters '("C" "D" "E")
-   :types '("so" "a" "dll" "dylib"))))
+   :types '("so" "a" "dll" "dylib")))
+
+(defun find-zlib-path ()
+  (or (find-zlib-path* "libz")
+      (find-zlib-path* "zlib1"))))
 
 #+(and uffi (or cmu sbcl))
 (eval-when (:compile-toplevel :load-toplevel :execute)

@@ -27,9 +27,20 @@
 ;; define the :pdf-binary feature if your Lisp implementation accepts
 ;; to write binary sequences to character streams
 ;; For LW you need version 4.2.7 minimum
-#+(or lispworks acl)
+#+(or lispworks allegro)
 (pushnew :pdf-binary *features*)
 
 ;(eval-when (:compile-toplevel :load-toplevel :execute)
-(defvar *zlib-search-paths* '("/usr/local/lib/" "/usr/lib/")
+(defvar *zlib-search-paths* `(,(directory-namestring *load-truename*)
+                              #+lispworks
+                              ,(directory-namestring (lw:lisp-image-name))
+                              "/usr/local/lib/"
+                              "/usr/lib/"
+                              "/windows/system32/"
+                              "/winnt/system32/")
   "The paths where to search the zlib shared library")
+
+;a catchall for vaious kind of errors that can appen in the generation of a document.
+; just catch 'max-number-of-pages-reached if you want to do something with this.
+(defvar *max-number-of-pages* 1000
+  "The maximum number of pages for a document")

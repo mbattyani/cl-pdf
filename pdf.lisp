@@ -130,6 +130,9 @@
 (defmethod initialize-instance :after ((page page) &rest init-options
 				       &key no-link (rotate 0) &allow-other-keys)
   (when (and *root-page* (not no-link))
+    (incf *page-number*)
+    (when (> *page-number* *max-number-of-pages*)
+      (throw 'max-number-of-pages-reached nil))
     (vector-push-extend page (pages *root-page*)))
   (setf (content-stream page) (make-instance 'pdf-stream))
   (add-dict-value (resources page) "/Font" (font-objects page))
@@ -467,17 +470,20 @@
 (defmethod write-document ((filename string) &optional (document *document*))
   (write-document (pathname filename) document))
 
-(defmacro with-document ((&rest args) &body body)
+(defmacro with-document ((&rest args &key (max-number-of-pages '*max-number-of-pages*))
+			 &body body)
+  
   `(let* ((*document* (make-instance 'document ,@args))
 	  (*outlines-stack* (list (outline-root *document*)))
 	  (*root-page* (root-page *document*))
 	  (*page* nil)
-	  (*page-number* 0))
-    ,@body))
+	  (*page-number* 0)
+	  (*max-number-of-pages* ,max-number-of-pages))
+    (catch 'max-number-of-pages-reached
+      ,@body)))
 
 (defmacro with-page ((&rest args) &body body)
   `(let* ((*page* (make-instance 'page ,@args)))
-    (incf *page-number*)
     (with-standard-io-syntax
 	(setf (content (content-stream *page*))
 	 (with-output-to-string (*page-stream*)

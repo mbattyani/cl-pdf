@@ -46,7 +46,7 @@
    (axis-min :accessor axis-min)
    (axis-max :accessor axis-max)
    (nb-subticks :accessor nb-subticks)
-   (format-string :accessor format-string)
+   (format-string :accessor format-string :initform nil :initarg :format-string)
    ))
 
 (defmethod initialize-instance :after ((axis value-axis) &rest init-options &key &allow-other-keys)
@@ -111,10 +111,11 @@
 	  (axis-scale axis) (/ (axis-size axis)(- (axis-max axis) (axis-min axis)))
 	  (ticks-separation axis)(/ (axis-size axis) (1- (nb-ticks axis)))
 	  (format-string axis)
-	  (if (integer-tick axis)
-	      "~d"
-	      (format nil "~~,~df" nfrac))
-	  (ticks-positions axis)(make-array (nb-ticks axis)))
+	  (or (format-string axis)
+	      (if (integer-tick axis)
+		  "~d"
+		  (format nil "~~,~df" nfrac)))
+	  (ticks-positions axis) (make-array (nb-ticks axis)))
     (loop for tick from 0 below (nb-ticks axis)
 	  for pos from 0 by (ticks-separation axis) do
 	  (setf (aref (ticks-positions axis) tick) pos))))
@@ -472,7 +473,9 @@
   (when (> (length (series plot)) 1)
     (setf (legend plot)
 	(apply #'make-instance 'legend
-	       :x (+ (x plot) (width plot) 10) :y (y plot) :width 60 :height (height plot)
+	       :x (or (getf legend-options :x) (+ (x plot) (width plot) 10))
+	       :y (or (getf legend-options :y) (y plot))
+	       :width 60 :height (height plot)
 	       :labels&colors (labels&colors plot)
 	       legend-options))))
 
