@@ -627,7 +627,7 @@
       ;; functions; and, by personal preference, special operators
       ;; should be expanded before iterate clauses.
 
-      ((macro-function (car form) *env*)
+      ((macro-form? (car form) *env*)
        (walk (macroexpand form *env*)))
       ((special-form? (car form))
        (walk-special-form form))
@@ -726,6 +726,15 @@
   ;; example.  Plus, we want to catch Iterate special clauses.
   (or (special-operator-p symbol)
       (assoc symbol *special-form-alist*)))
+
+(defun macro-form? (symbol &optional env)
+  ;; Workaround to deal with Allegro 7.0 where DECLARE has a
+  ;; MACRO-FUNCTION but MACROEXPANDING it goes into an infinite loop.
+  ;; Arguably this is rightous in any implementation because a DECLARE
+  ;; expression is not a form and MACROEXPAND's argumnet is supposed
+  ;; to be a form.
+  (when (not (eql symbol 'cl:declare))
+    (macro-function symbol env)))
 
 (defun walk-special-form (form)
   (let* ((*clause* form)
@@ -963,7 +972,7 @@ binding context like let or multiple-value-bind.")))
 	    (let ((args (cons (keywordize (first ppclause))
 			      (cdr ppclause)))
 		  (func (clause-info-function info)))
-	      (if (macro-function func *env*)
+	      (if (macro-form? func *env*)
 		  (walk (macroexpand (cons func args) *env*))
 		  (apply-clause-function func args))))
 	   (t
@@ -2020,7 +2029,7 @@ must not contain anything that depends on the body."
 	      (nconc free-vars (free-vars-list body bound-vars))))
 	(otherwise
 	    nil)))
-     ((macro-function (car form) *env*)
+     ((macro-form? (car form) *env*)
       (free-vars (macroexpand form *env*) bound-vars))
      (t ; function call
       (free-vars-list (cdr form) bound-vars))))
