@@ -434,7 +434,7 @@
      (write-document s document)))
 
 (defmethod write-document ((filename string) &optional (document *document*))
-  (write-document (pathname string) document))
+  (write-document (pathname filename) document))
 
 (defmacro with-document ((&rest args) &body body)
   `(let* ((*document* (make-instance 'document ,@args))
