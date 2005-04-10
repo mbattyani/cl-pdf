@@ -43,7 +43,12 @@
 
 (defmethod initialize-instance :after ((obj pdf-stream) &rest init-options &key empty &allow-other-keys)
   (unless empty
-    (add-dict-value obj "/Length" #'(lambda () (length (content obj))))))
+    (add-dict-value obj "/Length" 
+		    #'(lambda () 
+			(let ((content (content obj)))
+			  (if (consp content)
+			      (reduce #'+ content :key #'length)
+			      (length (content obj))))))))
 
 (defun compress-pdf-stream (pdf-stream)
   (when (and *compress-streams* (not (no-compression pdf-stream))
@@ -350,6 +355,8 @@
 				       &allow-other-keys)
  ;;; Args: color-space - can be an array!
   (enforce-/ filter) ; color-space)
+  (when (stringp color-space)
+    (enforce-/ color-space))
   (setf (content image)
 	(make-instance 'pdf-stream
 	       :no-compression no-compression

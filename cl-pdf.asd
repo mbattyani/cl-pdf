@@ -27,6 +27,8 @@
 #+use-salza-zlib
 (load (merge-pathnames "salza/salza.asd" *load-truename*))
 
+#+clisp (setf *warn-on-floating-point-contagion* nil)
+
 (defsystem :cl-pdf
   :name "cl-pdf"
   :author "Marc Battyani <marc.battyani@fractalconcept.com>"
