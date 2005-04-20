@@ -39,8 +39,7 @@
 (defun octet-replace (sequence1 sequence2 start1 end1 start2 end2)
   (declare (type octet-vector sequence1 sequence2)
            (fixnum start1 end1 start2 end2)
-           (optimize (speed 3) (safety 0)
-		     #+lispworks (hcl:fixnum-safety 0)))
+           (optimize (speed 3) (safety 0) #+lispworks (hcl:fixnum-safety 0)))
   (let ((i (min (- end1 start1) (- end2 start2))))
     (declare (fixnum i))
     (loop

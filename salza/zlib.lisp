@@ -117,7 +117,7 @@ of the stream.")
   "From the spec: For CM = 8, CINFO is the base-2 logarithm of the
 LZ77 window size, minus eight (CINFO=7 indicates a 32K window size).")
 
-(defconstant +zlib-compression-level+ 2
+(defconstant +zlib-compression-level+ 2		; zlib provides 6 by default
   "The default compression level code.")
 
 (defconstant +zlib-preset-dictionary-flag+ 0
@@ -204,15 +204,17 @@ to the zlib format."
   (let* ((buffer-size 8192)
          (zlib-buffer (make-array buffer-size :element-type 'octet))
          (offset 0)
-         (output (make-array buffer-size :adjustable t :initial-element 0)))
+         (output (make-array 0 :adjustable t :element-type 'octet))) ;:initial-element 0
     (flet ((zlib-callback (zlib-stream)
-             (let ((pos (zlib-stream-position zlib-stream)))
-               (adjust-array output (+ offset pos))
-               (replace output (zlib-stream-buffer zlib-stream)
-                        :start1 offset
+             (let* ((pos (zlib-stream-position zlib-stream))
+                    (end (+ offset pos)))
+               (declare (type buffer-offset pos end))
+               (replace (setf output (adjust-array output end))
+                        (zlib-stream-buffer zlib-stream)
+                        :start1 offset :end1 end
                         :end2 pos)
-               (incf offset pos)
-               (setf (zlib-stream-position zlib-stream) 0))))
+               (setf offset end
+                     (zlib-stream-position zlib-stream) 0))))
       (let ((zlib-stream (make-zlib-stream zlib-buffer
                                            :callback #'zlib-callback)))
         (zlib-write-sequence input zlib-stream)

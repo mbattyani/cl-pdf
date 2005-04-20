@@ -36,11 +36,12 @@
 
 (in-package :salza-deflate)
 
-(declaim (inline deflate-stream-buffer))
-(declaim (inline deflate-stream-pos))
-(declaim (inline deflate-stream-byte))
-(declaim (inline deflate-stream-end))
-(declaim (inline deflate-stream-bits-left))
+#-lispworks	; Supress lots of warning - these are special accessors on LW
+(declaim (inline deflate-stream-buffer
+                 deflate-stream-pos
+                 deflate-stream-byte
+                 deflate-stream-end
+                 deflate-stream-bits-left))
 
 (define-condition deflate-stream-buffer-full ()
   ((deflate-stream :initarg :deflate-stream :reader deflate-stream-buffer-full-deflate-stream)))
@@ -57,7 +58,7 @@
   (byte 0 :type octet)
   (bits-left 8 :type octet)
   (compress-buffer (make-array *compressor-buffer-size* :element-type 'octet)
-                   :type (simple-array octet))
+                   :type octet-vector)
   (compress-pos 0 :type buffer-offset)
   (compress-positions (make-fixhash-table)))
 
@@ -69,6 +70,7 @@
 (defun make-deflate-stream (buffer
                             &key (pos 0) end (callback #'default-callback))
   (check-type buffer octet-vector)
+  (initialize-huffman)
   (setf end (or end (length buffer)))
   (%make-deflate-stream buffer pos end callback))
 
@@ -80,14 +82,17 @@
             (deflate-stream-byte object)
             (deflate-stream-bits-left object))))
 
+;;; DI 2005-Apr-11: It seems CODE < 262136 (#x3FFF8)
+(declaim (ftype (function (fixnum (integer 0 24) t) buffer-offset) write-bits))
 (defun write-bits (code length deflate-stream)
   "Save LENGTH low bits of CODE to the buffer of DEFLATE-STREAM. If the end
 of the deflate-stream buffer is reached, raise a continuable error of type
 DEFLATE-STREAM-BUFFER-FULL."
-  (declare (type (unsigned-byte 24) code)
+  (declare (fixnum code)	;(type (unsigned-byte 24) code)
            (type (integer 0 24) length)
            (type deflate-stream deflate-stream)
-           (optimize (speed 3) (safety 0) (debug 0)))
+           (optimize (speed 3) (safety 0) (debug 0)
+                     #+lispworks (hcl:fixnum-safety 0)))
   (let ((byte (deflate-stream-byte deflate-stream))
         (bits-left (deflate-stream-bits-left deflate-stream))
         (pos (deflate-stream-pos deflate-stream))
@@ -95,11 +100,15 @@ DEFLATE-STREAM-BUFFER-FULL."
         (end (deflate-stream-end deflate-stream)))
     (declare (type octet-vector buffer)
              (type (integer 0 8) bits-left)
-             (type (integer 0 255) byte)
+             (type octet byte)
              (type buffer-offset pos end))
     (flet ((output-byte ()
              (setf (aref buffer pos) byte)
              (incf pos)
+             ;(if (< pos end)
+             ;    (values)
+             ;    (cerror "Resume output" 'deflate-stream-buffer-full
+             ;            :deflate-stream deflate-stream))))
              (loop
               (when (< pos end) (return))
               (setf (deflate-stream-pos deflate-stream) pos)
@@ -110,24 +119,23 @@ DEFLATE-STREAM-BUFFER-FULL."
       (declare (inline output-byte))
       (tagbody
        loop
+         ;(setf byte (logior byte (logand #xFF (ash code (- 8 bits-left)))))
+         (setf byte (the octet (logior byte (the fixnum
+                                       (logand #xFF (the fixnum
+                                               (ash code (the fixnum
+                                                    (- 8 bits-left)))))))))
          (cond ((> length bits-left)
-                (setf byte
-                      (logior byte
-                              (logand #xFF (ash code (- 8 bits-left)))))
                 (output-byte)
                 (decf length bits-left)
-                (setf code (ash code (- bits-left)))
-                (setf bits-left 8
+                (setf code (the fixnum (ash code (the fixnum (- bits-left))))
+                      bits-left 8
                       byte 0)
                 (go loop))
                ((= length bits-left)
-                (setf byte (logior byte
-                                   (logand #xFF (ash code (- 8 bits-left)))))
                 (output-byte)
                 (setf bits-left 8
                       byte 0))
                (t
-                (setf byte (logior byte (logand #xFF (ash code (- 8 bits-left)))))
                 (decf bits-left length))))
       (setf (deflate-stream-bits-left deflate-stream) bits-left
             (deflate-stream-byte deflate-stream) byte
@@ -135,12 +143,13 @@ DEFLATE-STREAM-BUFFER-FULL."
 
 (defconstant +deflate-fixed-tables-code+ #b01)
 
+#| DI 2005-Apr-11 : Identical to start-deflate-stream!
 (defun write-block-header (deflate-stream)
     ;; The block header
     ;; BFINAL is always set, since right now dynamic codes are not
     ;; supported so we never need to start a new block
     (write-bits 1 1 deflate-stream)
-    (write-bits +deflate-fixed-tables-code+ 2 deflate-stream))
+    (write-bits +deflate-fixed-tables-code+ 2 deflate-stream))|#
 
 (defun flush-deflate-stream (deflate-stream)
   "If there is a pending unwritten byte in the deflate-stream, save it and

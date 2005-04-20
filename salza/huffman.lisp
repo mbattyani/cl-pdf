@@ -38,21 +38,29 @@
 ;;; them backwards too.
 ;;;
 
+(declaim (ftype (function (fixnum fixnum) fixnum) reverse-bits))
 (defun reverse-bits (word n)
+  (declare (optimize (speed 3) (safety 0) (debug 0) #+lispworks (hcl:fixnum-safety 0))
+           (fixnum word n))
   (let ((j 0))
+    (declare (fixnum j))
     (dotimes (i n j)
+      (declare (fixnum i))
       (setf j (logior (ash j 1) (logand #x1 word)))
       (setf word (ash word -1)))))
 
 (defun fixed-huffman-table ()
   "Generate the fixed Huffman code table specified by RFC1951."
-  (let ((table (make-array (* 288 2)))
+  (declare (optimize (speed 3) (safety 0) (debug 0) #+lispworks (hcl:fixnum-safety 0)))
+  (let ((table (make-array (* 288 2)))	;:element-type (mod 512)
         (i 0))
+    (declare (fixnum i))
     (flet ((fill-range (length start end)
-             (loop for j from start to end do
-                     (setf (aref table i) (reverse-bits j length)
-                           (aref table (incf i)) length)
-                     (incf i))))
+             (declare (fixnum length start end))
+             (loop for j fixnum from start to end
+                   do (setf (aref table i) (reverse-bits j length)
+                            (aref table (incf i)) length)
+                      (incf i))))
       (fill-range 8 #b00110000  #b10111111)
       (fill-range 9 #b110010000 #b111111111)
       (fill-range 7 #b0000000   #b0010111)
@@ -68,16 +76,21 @@
 ;;; Since we only deal with encoding with the fixed Huffman table
 ;;; described in the RFC right now, everything can be precomputed.
 
+(declaim (ftype (function (t fixnum fixnum fixnum) fixnum) save-pair))
 (defun save-pair (array i code length)
   "Store CODE and LENGTH in consecutive positions in ARRAY."
+  (declare (optimize (speed 3) (safety 0) (debug 0) #+lispworks (hcl:fixnum-safety 0))
+           (fixnum i length))
   (let ((index (ash i 1)))
+    (declare (fixnum index))
     (setf (aref array index) code
           (aref array (1+ index)) length)))
 
 (defun length-table (huffman-table)
   "Compute a table of the (Huffman + extra bits) values for all
 possible lengths for the given HUFFMAN-TABLE."
-  (let ((table (make-array (* 259 2)))
+  (declare (optimize (speed 3) (safety 0) (debug 0) #+lispworks (hcl:fixnum-safety 0)))
+  (let ((table (make-array (* 259 2)))	;:element-type '(or null (mod 8132))
         (code 257)
         (length 3)
         (extra-bit-counts '(0 0 0 0 0 0 0 0
@@ -106,7 +119,7 @@ possible lengths for the given HUFFMAN-TABLE."
 (defun distance-table ()
   "Compute a table of the (code + extra bits) values for all possible
 distances as specified by RFC1951."
-  (let ((table (make-array (* 32769 2)))
+  (let ((table (make-array (* 32769 2))) ;:element-type '(or null (mod 262136))
         (code 0)
         (distance 1)
         (extra-bit-counts '(0 0 0 0
@@ -122,6 +135,9 @@ distances as specified by RFC1951."
           (incf distance))
         (incf code)))))
 
+(declaim (ftype (function ((integer 0 258) t)	buffer-offset)	write-literal)
+         (ftype (function ((integer 0 32768) t) buffer-offset)	write-distance)
+         (ftype (function ((integer 0 258) t)	buffer-offset)	write-length))
 (let ((lvtable (fixed-huffman-table)))
   (declare (type simple-vector lvtable))
   (defun write-literal (code bitstream)
@@ -132,6 +148,7 @@ distances as specified by RFC1951."
                 (svref lvtable (1+ (ash code 1))) 
                 bitstream)))
 
+;;; DI 2005-Apr-12: Should be created at run-time instead of load-time!
 (let ((lvtable (distance-table)))
   (declare (type simple-vector lvtable))
   (defun write-distance (distance bitstream)
@@ -154,5 +171,8 @@ BITSTREAM."
                 (svref lvtable (1+ (ash length 1)))
                 bitstream)))
 
+;;; Stub called from make-deflate-stream if di-huffman is not used.
+(defun initialize-huffman (&optional force)
+  (declare (ignore force))
 
 

@@ -41,3 +41,50 @@
 
 (deftype octet-vector ()
   '(simple-array octet (*)))
+
+;;; Macrology for porting effectively to various implementaions.
+;;; LW 4.4 port by Dmitriy Ivanov
+
+#+(and lispworks (not (or lispworks4.3 lispworks4.2 lispworks4.1 lispworks4.0)))
+(eval-when (:compile-toplevel :execute)
+  (pushnew :lw-int32 *features*))
+
+;;; Type use for compression trigram (or general-purpose?)
+(deftype ub24 ()
+  #+lw-int32 'sys:int32
+  #-lw-int32 '(unsigned-byte 24))
+
+(defmacro ub-octet (position arg)
+ ;;; General pseudo-unsigned-byte accessor a la ldb.
+  ;; Args: position - bit position.
+  #+lw-int32
+  `(the octet (sys:int32-to-integer (sys:int32-logand ,(if (eql position 0)
+                                                           arg
+                                                           `(sys:int32>> ,arg ,position))
+                                                      #xFF)))
+  #-lw-int32
+  `(the octet (ldb (byte 8 ,position) ,arg)))
+
+(defmacro ub24<<push (ub24 octet)
+  #+lw-int32
+  `(sys:int32-logior (sys:int32<< (sys:int32-logand ,ub24 #xFFFF) 8) (the octet ,octet))
+  #-lw-int32
+  `(the ub24 (logior (the ub24 (ash (the ub24 (logand ,ub24 #xFFFF)) 8))
+                     (the octet ,octet))))
+
+(define-symbol-macro +ub24-0+
+  #+lw-int32 sys:+int32-0+
+  #-lw-int32 0)
+
+
+(deftype fixhash-integer ()
+  "#xFFFFFF is out of fixnum range on LispWorks."
+  #+lw-int32 'fixnum
+  #-lw-int32 '(integer 0 #xFFFFFF))
+
+(defmacro ub24-fixhash (ub24)
+  #+lw-int32
+  `(the fixhash-integer (sys:int32-to-integer (sys:int32+ ,ub24 most-negative-fixnum)))
+  #-lw-int32
+  ub24)
+

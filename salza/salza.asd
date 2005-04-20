@@ -37,25 +37,32 @@
 (in-package :salza-system)
 
 (defsystem :salza
-  :components ((:file "fixhash")
-               (:file "packages"
-                      :depends-on ("fixhash"))
+  :components ((:file "packages")
                (:file "types"
                       :depends-on ("packages"))
+               (:file "fixhash"
+                      :depends-on ("packages" "types"))
                (:file "deflate-stream"
                       :depends-on ("packages"
                                    "types"))
+               #-lispworks
                (:file "huffman"
                       :depends-on ("packages"
                                    "types"
                                    "deflate-stream"))
+;di-huffman probably also works on other implementations than LW (tests needed)
+               #+lispworks
+               (:file "di-huffman"
+                      :depends-on ("packages"
+                                   "types"
+                                   "deflate-stream"))
                (:file "octet-replace"
-                      :depends-on ("packages"))
+                      :depends-on ("packages" "types"))
                (:file "compressor"
                       :depends-on ("packages"
                                    "types"
                                    "deflate-stream"
-                                   "huffman"
+                                   #-lispworks "huffman" #+lispworks "di-huffman"
                                    "octet-replace"))
                (:file "deflate-stream-interface"
                       :depends-on ("packages"
@@ -65,7 +72,6 @@
                       :depends-on ("packages"
                                    "types"
                                    "deflate-stream"
-                                   "huffman"
                                    "compressor"))))
 
 

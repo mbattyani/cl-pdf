@@ -74,7 +74,7 @@ next octet to DEFLATE-STREAM."
   #+(and allegro (not octet-characters))
   (excl:string-to-octets string :start start :end end :null-terminate nil)
   #+(and clisp (not octet-characters))
-  (ext:convert-string-to-bytes string charset:iso-8859-1 :start start :end end)
+  (ext:convert-string-to-bytes string charset:ascii :start start :end end)
   #+(or octet-characters lispworks)
   (let* ((length (- end start))
          (result (make-array length :element-type 'octet)))

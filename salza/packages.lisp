@@ -37,8 +37,20 @@
   (:use :cl)
   (:export :octet
            :octet-vector
-           :buffer-offset))
+           :buffer-offset
+           #:ub-octet
+           #:ub24 
+           #:ub24<<push
+           #:+ub24-0+
+           #:ub24-fixhash
+           #:fixhash-integer))
   
+(defpackage :fixhash
+  (:use :cl :salza-types)
+  (:export :make-fixhash-table
+           :getfixhash
+           :clrfixhash))
+
 (defpackage :salza-deflate
   (:use :cl :salza-types :fixhash)
   (:nicknames :deflate)

@@ -38,17 +38,7 @@
 ;;; 
 ;;; $Id: fixhash.lisp,v 1.7 2005/04/01 21:55:24 xach Exp $
 
-(defpackage :fixhash
-  (:use :cl)
-  (:export :make-fixhash-table
-           :getfixhash
-           :clrfixhash))
-
 (in-package :fixhash)
-
-(deftype fixhash-integer ()
-  "#xFFFFFF is out of fixnum range on LispWorks."
-  '(integer 0 #xFFFFFF))
 
 (defparameter *sizes*
   #(4096
@@ -73,30 +63,34 @@
             (fixhash-table-size fixhash-table))))
 
 (defun rehash (table)
-  (declare (optimize (speed 3) (safety 0)))
+  (declare (optimize (speed 3) (safety 0)
+                     #+lw-int32 (hcl:fixnum-safety 0)))
   (let ((level (fixhash-table-level table))
         (keys/values (fixhash-table-keys/values table))
         (size (fixhash-table-size table)))
+    (declare (fixnum level size))
     (when (= 3 level)
       (error "Hash table full"))
     (let* ((new-size (svref *sizes* (incf level)))
            (new-keys/values (make-array (the fixnum (* new-size 2))
                                         :initial-element 0
                                         :element-type 'fixhash-integer)))
-      (dotimes (i (* size 2))
+      (dotimes (i (the fixnum (* size 2)))
+        (declare (fixnum i))
         (setf (aref new-keys/values i) (aref keys/values i)))
       (setf (fixhash-table-keys/values table) new-keys/values
             (fixhash-table-size table) new-size
             (fixhash-table-level table) level))))
 
+(declaim (ftype (function (fixhash-integer t) fixhash-integer) getfixhash))
 (defun getfixhash (k fixhash-table)
   (declare (optimize (speed 3) (safety 0) (debug 0)
-                     #+lispworks (hcl:fixnum-safety 0))
+                     #+lw-int32 (hcl:fixnum-safety 0))
            (type fixhash-integer k))
   (let* ((size (fixhash-table-size fixhash-table))
          (mask (1- size))
-         (h1 (logand k mask))
-         (h2 (logior 1 (mod k (1- size))))
+         (h1 (the fixnum (logand k mask)))
+         (h2 (the fixnum (logior 1 (the fixnum (mod k mask)))))
          (j 0)
          (i*h2 0)
          (table (fixhash-table-keys/values fixhash-table)))
@@ -104,7 +98,9 @@
     (dotimes (i size (and (rehash fixhash-table) 0))
       (declare (fixnum i))
       (incf i*h2 h2)
-      (setf j (ash (logand mask (+ h1 i*h2)) 1))
+      ;(setf j (ash (logand mask (+ h1 i*h2)) 1))
+      (setf j (the fixnum
+                   (ash (the fixnum (logand mask (the fixnum (+ h1 i*h2)))) 1)))
       (let ((kt (aref table j)))
         (when (= k kt)
           (return (aref table (1+ j))))
@@ -113,9 +109,11 @@
                 (fixhash-table-last-key-pos fixhash-table) j)
           (return 0))))))
 
+(declaim (ftype (function (fixhash-integer fixhash-integer t) fixhash-integer)
+                (setf getfixhash)))
 (defun (setf getfixhash) (new-value k fixhash-table)
   (declare (optimize (speed 3) (safety 0) (debug 0)
-                     #+lispworks (hcl:fixnum-safety 0))
+                     #+lw-int32 (hcl:fixnum-safety 0))
            (type fixhash-integer new-value k))
   (let ((last-key (fixhash-table-last-key fixhash-table))
         (last-key-pos (fixhash-table-last-key-pos fixhash-table))
@@ -125,15 +123,17 @@
               (aref table (1+ last-key-pos)) new-value)
         (let* ((size (fixhash-table-size fixhash-table))
                (mask (1- size))
-               (h1 (logand k mask))
-               (h2 (logior 1 (mod k (1- size))))
+               (h1 (the fixnum (logand k mask)))
+               (h2 (the fixnum (logior 1 (the fixnum (mod k mask)))))
                (i*h2 0)
                (j 0))
           (declare (type (integer 0 131072) h2 h1 i*h2 size mask))
           (dotimes (i size)
             (declare (fixnum i))
             (incf i*h2 h2)
-            (setf j (ash (logand mask (+ h1 i*h2)) 1))
+            ;(setf j (ash (logand mask (+ h1 i*h2)) 1))
+            (setf j (the fixnum
+                         (ash (the fixnum (logand mask (the fixnum (+ h1 i*h2)))) 1)))
             (let ((kt (aref table j)))
               (when (or (= k kt) (zerop kt))
                 (setf (aref table j) k
@@ -142,10 +142,9 @@
 
 (defun clrfixhash (fixhash-table)
   (declare (optimize (speed 3) (safety 0)
-                     #+lispworks (hcl:fixnum-safety 0)))
+                     #+lw-int32 (hcl:fixnum-safety 0)))
   (let ((table (fixhash-table-keys/values fixhash-table)))
     (dotimes (i (length table))
       (declare (fixnum i))
       (setf (aref table i) 0)))
   fixhash-table)
-

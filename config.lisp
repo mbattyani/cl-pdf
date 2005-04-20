@@ -8,10 +8,13 @@
 ;;; depending on your Lisp implementation/OS/installation.
 
 (defconstant +external-format+ #-(or lispworks clisp allegro) :default
-   #+(and allegro mswindows) (excl:crlf-base-ef :1252) ;;:1252-base
+   #+(and allegro mswindows) :octets
    #+(and allegro unix) :default
    #+lispworks '(:latin-1 :eol-style :lf)
    #+clisp :unix)
+
+#+clisp
+(setf *default-file-encoding*  (ext:make-encoding :charset charset:iso-8859-1))
 
 (defvar *min-size-for-compression* 300)
 
