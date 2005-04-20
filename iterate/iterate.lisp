@@ -90,7 +90,6 @@
 ;;;  - for var choose, for var repeatedly
 
 ;;; For CL version 2:
-;;;  - more special forms
 ;;;  - variable info from environments
 ;;;  - macro info     "     " (so we can support macrolet)
 ;;;  - use errors for EOF
@@ -125,7 +124,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Constants and global variables.
-(defconst version "1.3" "Current version of Iterate")
+(defconst version "1.4" "Current version of Iterate")
 
 
 
@@ -245,7 +244,7 @@
 ;;; It's an alist of (accum-var kind <possibly other info>).
 ;;; The currently used kinds are:
 ;;;   :collect     for collect, nconc, append, etc.
-;;;   :increment   for sum and count
+;;;   :increment   for count, sum and multiply
 ;;;   :max         for maximize
 ;;;   :min         for minimize
 ;;;   :if-exists   for always/never/thereis and finding such-that
@@ -290,8 +289,8 @@
     (let . 		    walk-let)
     (let* . 		    walk-let)
     (load-time-value .      nil)
-    (locally .              walk-locally)
-    (macrolet . 	    walk-macrolet)
+    (locally .              walk-cdr-with-declarations)
+    ;(macrolet . 	    walk-macrolet) ; uncomment to raise error
     (multiple-value-call .  walk-cdr)
     (multiple-value-prog1 . walk-cdr)
     (progn . 		    walk-progn)
@@ -299,7 +298,7 @@
     (quote . 		    nil)
     (return-from . 	    walk-cddr)
     (setq . 		    walk-setq)
-    (symbol-macrolet . 	    walk-symbol-macrolet)
+    (symbol-macrolet . 	    walk-cddr-with-declarations)
     (tagbody . 		    walk-cdr)
     (the . 		    walk-cddr)
     (throw . 		    walk-cdr) 
@@ -323,6 +322,7 @@
     (and .		    walk-cdr)
     (ignore-errors .	    walk-cdr) ; expands to handler-bind in CLISP
     (multiple-value-list .  walk-cdr)
+    (multiple-value-setq .  walk-cddr)
     (nth-value .	    walk-cdr)
     (or .		    walk-cdr)
     (prog1 .		    walk-cdr)
@@ -340,6 +340,15 @@
 ;;; of temporaries that have already been created and given bindings.
 ;;; *temps-in-use* is a list of temporaries that are currently being used.
 ;;; See with-temporary, with-temporaries.
+;;; This seems to stem from a time where it was more efficient to use
+;;; (prog (temp)
+;;;    ... (setq temp #) ; somewhere deep inside the body
+;;;        (foo temp)
+;;;        (bar temp)
+;;;    ...)
+;;; than using a local let deep inside that body, as in
+;;; (tagbody ... (let ((temp #)) (foo temp) (bar temp)) ...)
+;;; which may be be easier for compiler data flow and lifetime analysis.
 
 (defvar *temps*)
 (defvar *temps-in-use*)
@@ -542,10 +551,10 @@
 		      (tagbody ,@init-code
 			 ,*loop-top*
 			 ,@body
-			 ,@(if *loop-step-used?* (list *loop-step*))
+			 ,.(if *loop-step-used?* (list *loop-step*))
 			 ,@steppers
 			 (go ,*loop-top*)
-			 ,@(if *loop-end-used?* (list *loop-end*))
+			 ,.(if *loop-end-used?* (list *loop-end*))
 			 ,@final-code)
 		      ,(if (member *result-var* *bindings* :key #'car)
 			   *result-var*
@@ -662,8 +671,7 @@
 				    form)
 		    (list form)))))
       ((special-operator-p (car form))
-       (clause-warning "The implementation claims that ~a is a special form, but ~
-  Iterate does not know how to handle it. ~
+       (clause-warning "Iterate does not know how to handle the special form ~s~%~
   It will not be walked, which means that Iterate clauses inside it will ~
   not be seen." form)
        (list form))
@@ -939,7 +947,7 @@
 		       :final (nconc b-final final)
 		       :final-protected (nconc b-finalp finalp)))))))
 
-(defun walk-locally (first &rest stuff)
+(defun walk-cdr-with-declarations (first &rest stuff) ; aka walk-locally
   ;; Set *top-level?* false (via walk-arglist).
   ;; Note that when *top-level?* is false, walk won't yield declarations
   ;; because walk-declare errors out since all forms with
@@ -952,17 +960,18 @@
     (return-code-modifying-body #'walk-arglist forms
 				#L(list (cons first (nconc decls !1))))))
 
+(defun walk-cddr-with-declarations (first second &rest stuff)
+  (let* ((forms (member 'declare stuff :key #L(if (consp !1) (car !1))
+			:test-not #'eq))
+	 (decls (ldiff stuff forms)))
+    (return-code-modifying-body #'walk-arglist forms
+				#L(list (cons first (cons second (nconc decls !1)))))))
 
-(defun walk-macrolet (&rest stuff)
-  (macrolet-error stuff 'macrolet))
 
-(defun walk-symbol-macrolet (&rest stuff)
-  (macrolet-error stuff 'symbol-macrolet))
-
-(defun macrolet-error (stuff form-name)
+(defun walk-macrolet (form-name &rest stuff)
   (declare (ignore stuff))
   (error "~A is not permitted inside Iterate. Please ~
-  refactor the iterate form (e.g. by using ~As that wrap ~
+  refactor the Iterate form (e.g. by using ~As that wrap ~
   the ITERATE form)." form-name form-name))
 
 #+allegro
@@ -1242,12 +1251,11 @@
       (cond
        ((null (cdr keywords))
 	;; Duplication; warn if they are not completely identical.
-	(if (not (equal (clause-info-keywords (cdr entry))
-			(clause-info-keywords info)))
-	    (format *error-output* 
-		    "~&Warning: replacing clause ~a~%with ~a~%"
-		    (clause-info-keywords (cdr entry))
-		    (clause-info-keywords info)))
+	(unless (equal (clause-info-keywords (cdr entry))
+		       (clause-info-keywords info))
+	  (warn "replacing clause ~a~%with ~a"
+		(clause-info-keywords (cdr entry))
+		(clause-info-keywords info)))
 	(setf (cdr entry) info))
        (t
 	(ambiguity-check-clause (cdr entry) info 2)
@@ -1323,29 +1331,29 @@
 (defun remove-clause (clause-keywords)
   ;; CLAUSE-KEYWORDS is a list that (once the symbols have been
   ;; keywordized) should be equal to some clause in the index.
- (let* ((all-keywords (mapcar #L(if (eq !1 '&optional) !1 (keywordize !1))
-			      clause-keywords))
-	(req-keywords (cons (car clause-keywords)
-			    (cdr (ldiff all-keywords (member '&optional
-							     all-keywords))))))
+ (let* ((all-keywords
+	 (cons (first clause-keywords)
+	       (mapcar #L(if (eq !1 '&optional) !1 (keywordize !1))
+		       (rest clause-keywords))))
+	(req-keywords
+	 (ldiff all-keywords (member '&optional all-keywords :test #'eq))))
    (labels ((remove-clause-internal (keywords index)
-	      (if (null keywords)
-		  (error "Clause ~a not found" clause-keywords)
-		  (let ((entry (index-lookup (car keywords) index)))
-		    (cond
-		     ((null entry)
-		      (error "Clause ~a not found" clause-keywords))
-		     ((clause-info-p (cdr entry))
-		      (if (equal all-keywords 
-				 (clause-info-keywords (cdr entry)))
-			  (delete entry index)))
-		     (t ;; an index
-		      (remove-clause-internal (cdr keywords) (cdr entry))
-		      ;; if the index is empty, delete it too
-		      (if (null (cddr entry))
-			  (delete entry index))))))))
-     (remove-clause-internal req-keywords *clause-info-index*))
-   t))
+	      (let ((entry (and keywords
+				(index-lookup (car keywords) index))))
+		(cond ((null entry)
+		       (error "Clause ~a not found" clause-keywords))
+		      ((clause-info-p (cdr entry))
+		       (when (equal all-keywords 
+				    (clause-info-keywords (cdr entry)))
+			 ;; else warn that an &optional part is missing??
+			 (delete entry index) t))
+		      (t ;; an index
+		       (prog1
+			   (remove-clause-internal (cdr keywords) (cdr entry))
+			 ;; if the index is empty, delete it too
+			 (if (null (cddr entry))
+			     (delete entry index))))))))
+     (remove-clause-internal req-keywords *clause-info-index*))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1396,7 +1404,7 @@
 		 `((,kw ,val))
 		 `((,kw ,(car val)) ,@(cdr val)))))
       (let ((last (car (last clause-template))))
-	(if (and (symbolp last) (string= last "&SEQUENCE"))
+	(if (and (symbolp last) (string= last '&sequence))
 	    (setq clause-template 
 		  (nconc (butlast clause-template)
 			 (if (member '&optional clause-template)
@@ -1521,7 +1529,7 @@
 			 (cond 
 			  (with-index
 			   (clause-error "WITH-INDEX keyword should not ~
-                                         be specified for this clause"))
+  be specified for this clause"))
 			  (t
 			   (setq with-index var)
 			   (return-sequence-code
@@ -1548,6 +1556,7 @@
 		      ,@then))))
     (values code var)))
 
+;;; Deprecated.  Dangerous when incorrectly nested
 (defmacro with-temporary (var &body body)
   (let ((old-var (gensym))
 	(vars (listify var)))
@@ -1558,6 +1567,7 @@
 	     ,@body)
 	 (setq *temps-in-use* ,old-var)))))
 
+#+nil ;; unused
 (defmacro with-temporaries (n vlist &body body)
   (let ((old-var (gensym)))
     `(let ((,old-var *temps-in-use*))
@@ -1813,7 +1823,7 @@
     (coerce (code-char 0) type)) ; Neither #\Null nor #\Nul are valid characters.
    (t 
     (clause-warning 
-     "Cannot supply an initial value for type ~a; using NIL."
+     "Cannot supply an initial value for type ~s; using NIL."
      type)
     nil)))
 
@@ -1923,10 +1933,10 @@
   (cond
    ((null template)
     (dsetq-error "Can't bind to nil"))
-   ((symbolp template)
+   ((var-spec? template) ; not only (symbolp template)
     (if bindings?
 	(make-default-binding template :type type))
-    `(setq ,template ,value))
+    `(setq ,(extract-var template) ,value))
    ((and (consp template) (eq (car template) 'values))
     ;; Just do a simple check for the most common errors.  There's no way we
     ;; can catch all problems.
@@ -1934,7 +1944,7 @@
 	(dsetq-error "Multiple values make no sense for this expression" )
 	(make-mv-dsetqs (cdr template) value bindings?)))
    (t
-    (let ((temp (gensym)))
+    (let ((temp (gensym "DSETQ")))
       `(let ((,temp ,value))
 	 ,.(if type `((declare (type ,type ,temp))))
 	 ,.(make-dsetqs template temp bindings?)
@@ -1968,7 +1978,7 @@
 	(if bindings?
 	    (make-default-binding tp)))
        (t ; either NIL or destructuring template
-	(let ((temp (gensym)))
+	(let ((temp (gensym "VALUE")))
 	  (push tp tplates)
 	  (push temp temps)
 	  (push temp vars)))))
@@ -2002,7 +2012,7 @@
     (if vars
 	(let ((len (length vars)))
 	  (clause-error "The variable~p ~a ~a bound in a context internal to ~
-  the Iterate form.~%
+  the Iterate form.~%~
   This part of the clause will be moved outside the body of the loop, so it ~
   must not contain anything that depends on the body."
 			len (if (= len 1) (car vars) vars)
@@ -2344,13 +2354,16 @@
 (defun make-next-code (var code n)
   ;; Construct the body carefully (avoid backquote), ensuring that CODE,
   ;; and not a copy, appears in it.
-  (let ((var-code (if (eq var (var-value-returned code))
-		      nil
-		      (list var))))
-    (if (eql n 1)
-	(list (cons 'progn (nconc code var-code)))
-	(let ((i (genvar 'next)))
-	  (list (list* 'dotimes (list i n var) `(declare (ignore ,i)) code))))))
+  (if (eql n 1)
+      (let ((var-code (if (eq var (var-value-returned code))
+			  ()
+			  (list var))))
+	;; This var-value-returned optimization benefits
+	;; FOR IN-VECTOR/SEQUENCE/STRING.
+	;; Too small a benefit in light of current compilers?
+	(list (cons 'progn (nconc code var-code))))
+      (let ((i (genvar 'next)))
+	(list (list* 'dotimes (list i n var) `(declare (ignore ,i)) code)))))
 
 
 (defun var-value-returned (forms)
@@ -2364,7 +2377,7 @@
      ((atom form)
       nil)
      ((eq (car form) 'setq)
-      (nth (- (length form) 2) form))
+      (second (last form 3)))		; support degenerated (setq)
      ((eq (car form) 'progn)
       (var-value-returned (cdr form)))
      (t
@@ -2437,17 +2450,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Sequence iteration
 
-(defclause-driver (FOR var-spec ON list &optional BY (step ''cdr))
+(defclause-driver (FOR var ON list &optional BY (step ''cdr))
   "Sublists of a list"
   (top-level-check)
-  (let* ((var (extract-var var-spec))
-	 (list-var (make-var-and-default-binding 'list :type 'list))
-	 (test `(if (,*list-end-test* ,list-var) (go ,*loop-end*)))
-	 (setq (do-dsetq var-spec list-var)))
+  (let* ((list-var (make-var-and-default-binding 'list :type 'list))
+	 (setqs (do-dsetq var list-var))
+	 (test `(if (,*list-end-test* ,list-var) (go ,*loop-end*))))
     (setq *loop-end-used?* t)
     (return-driver-code :initial `((setq ,list-var ,list))
 			:next (list test
-				    setq
+				    setqs
 				    (generate-function-step-code 
 				     list-var step))
 			:variable var)))
@@ -2528,7 +2540,7 @@
   (top-level-check)
   (unless (and (listp sym-access-pkg-vars) ; empty list is allowed (count)
 	       (every #'symbolp sym-access-pkg-vars))
-    (clause-error "~s should be a list of up to three variables: the symbol, ~
+    (clause-error "~a should be a list of up to three variables: the symbol, ~
   the access type and the home package." sym-access-pkg-vars))
   (unless (consp sym-types)
     (clause-error "~s should be a list of symbols indicating the symbols' ~
@@ -2679,7 +2691,7 @@
 (defclause (FOR var = expr)
   "Set a variable on each iteration"
   ;; Set var each time through the loop.
-  ;; VALUE: expr.
+  ;; VALUE: primary value of expr.
   (let ((vars (extract-vars var))
 	(code (list (do-dsetq var (walk-expr expr)))))
     (register-previous-code vars code :next)
@@ -2687,10 +2699,10 @@
 
 
 (defclause (FOR var FIRST first-expr THEN then-expr)
-  "Set var on first, and on subsequent, iterations"
+  "Set var on first, and then on subsequent iterations"
   ;; Set var in the loop, but differently the first time.  Most
   ;; inefficient of the three.
-  ;; VALUE: first- or then-expr.
+  ;; VALUE: primary value of first- or then-expr.
   (let* ((first-setq (list (do-dsetq var (walk-expr first-expr))))
 	 (then-setq  (list (do-dsetq var (walk-expr then-expr) nil))))
     (register-previous-code (extract-vars var) then-setq :initial)
@@ -2713,10 +2725,11 @@
   ;;  TYPE is the type of the accumulation variable.
   ;;  ACCUM-KIND is the kind of accumulation this is--:increment, :max,
   ;;etc.  If NIL, then it matches any kind.
-  ;; VALUE RETURNED: the value accumulated so far.
+  ;; VALUE: the value accumulated so far.
   (setq variable (or variable *result-var*))
   (let* ((var (extract-var variable))
 	 (expr (walk-expr expression))
+	 (test-expr (if test (walk-expr test)))
 	 (op-expr (if external-op?
 		      (make-funcall operation var expr)
 		      (make-application operation var expr)))
@@ -2724,7 +2737,7 @@
     (make-accum-var-binding variable identity accum-kind 
 			    :type type :using-type-of using-type-of)
     (return-code :body (if test
-			   `((if ,test ,update-code ,var))
+			   `((if ,test-expr ,update-code ,var))
 			   (list update-code)))))
 
 (defsynonym count counting)
@@ -2768,6 +2781,7 @@
 (defclause (REDUCING expr BY op &optional INITIAL-VALUE (init-val nil iv?)
 		                          INTO var-spec)
   "Generalized reduction"
+  ;; VALUE: the value accumulated so far.
   ;; If we don't know the initial value, we can't use RETURN-REDUCTION-CODE.
   ;; We have to be inefficient and do something different the first time.
   ;; Also, we have to share the first-time-var in case of multiple reductions
@@ -2779,6 +2793,7 @@
 			   :operation op
 			   :external-op? t
 			   :expression expr
+			   :test nil
 			   :variable var-spec
 			   :type (expr-type-only op)
 			   :accum-kind nil))  ; matches anything
@@ -2852,7 +2867,7 @@
   (setq *loop-end-used?* t)
   `(go ,*loop-end*))
 
-(defmacro terminate ()
+(defmacro terminate () ; recommended for use with FOR ... NEXT
   '(finish))
 
 (defmacro next-iteration ()
@@ -2883,7 +2898,7 @@
 
 (defclause (ALWAYS expr)
   "Return last value iff expression is always non-nil"
-  ;; VALUE: expr
+  ;; VALUE: primary value of expr
   (setq expr (walk-expr expr))
   (let ((var *result-var*))
     (make-accum-var-binding var t :if-exists)
@@ -2893,7 +2908,7 @@
 
 (defclause (NEVER expr)
   "Return T iff expression is never non-nil"
-  ;; VALUE: expr (which is always nil)
+  ;; VALUE: always nil
   (setq expr (walk-expr expr))
   (let ((var *result-var*))
     ;; Do not use :type 'symbol so as be compatible with ALWAYS
@@ -2904,7 +2919,7 @@
 
 (defclause (THEREIS expr)
   "Return value of expression as soon as it is non-nil"
-  ;; VALUE: expr (which is always nil)
+  ;; VALUE: always nil
   (setq expr (walk-expr expr))
   (let ((var *result-var*))
     (make-accum-var-default-binding var :if-exists)
@@ -2930,11 +2945,11 @@
 	    (return-code :body `((when ,(make-funcall test expr)
 				   (setq ,var ,expr)
 				   (go ,*loop-end*))))
-	    (with-temporary temp-var
-	      (return-code :body `((setq ,temp-var ,expr)
-				   (when ,(make-funcall test temp-var)
-				     (setq ,var ,temp-var)
-				     (go ,*loop-end*))))))
+	    (let ((temp-var (gensym "FINDING")))
+	      (return-code :body `((let ((,temp-var ,expr))
+				     (when ,(make-funcall test temp-var)
+				       (setq ,var ,temp-var)
+				       (go ,*loop-end*)))))))
 	(return-code :body `((when ,test
 			       (setq ,var ,expr)
 			       (go ,*loop-end*)))))))
@@ -2948,7 +2963,7 @@
   (return-find-extremum-code expr min-expr variable :min))
 
 (defun return-find-extremum-code (expr m-expr var kind)
-  ;; VALUE: max/min expr so far.
+  ;; VALUE: expr corresponding to max/min-expr so far.
   ;; Variable can be a list of two variables, in which case the first
   ;; is used for the expr and the second for the extremum.
   ;; The update code looks something like this:
@@ -3040,8 +3055,9 @@
       (clause-error "~a is neither 'start', 'beginning' nor 'end'" place))))
   (let* ((collect-var-spec (or variable *result-var*))
 	 (collect-var (extract-var collect-var-spec))
-	 (entry (make-accum-var-binding collect-var-spec nil 
-					:collect :type 'list))
+	 (entry (make-accum-var-binding collect-var-spec nil :collect
+		 :type (if (eq result-type 'list) 'list
+			 `(or list ,result-type))))
 	 (end-pointer (third entry))
 	 (prev-result-type (fourth entry)))
     (cond
@@ -3197,6 +3213,7 @@
 (defclause (ACCUMULATE expr BY op &optional INITIAL-VALUE init-val 
 		                            INTO var-spec)
   "Generalized accumulation"
+  ;; VALUE: the value accumulated so far.
   ;; This is just like REDUCING except, 1. the args to OP are in the other
   ;; order, and 2. if no initial value is supplied, NIL is used. 
   (local-binding-check init-val)
@@ -3420,27 +3437,19 @@
       (car forms)))
 
 (defun clause-error (format-string &rest args)
-  (if (boundp '*clause*)
-      (apply #'error 
-	     (concatenate 'string "Iterate, in ~a:~%" format-string)
-	     *clause*
-	     args)
-      (apply #'error
-	     (concatenate 'string "Iterate: " format-string)
-	     args)))
+  (apply #'error
+	 (concatenate 'string 
+		      "Iterate~@[, in ~a~]:~%" format-string)
+	 (and (boundp' *clause*) *clause*)
+	 args))
 
 (defun clause-warning (format-string &rest args)
-  (if (boundp '*clause*)
-      (apply #'format 
-	     *error-output*
-	     (concatenate 'string 
-			  "Warning: Iterate, in clause ~a:~%" format-string)
-	     *clause*
-	     args)
-      (apply #'format 
-	     *error-output*
-	     (concatenate 'string "Warning: Iterate: " format-string)
-	     args)))
+  (let ((*print-pretty* t))
+    (apply #'warn
+	   (concatenate 'string 
+			"Iterate~@[, in clause ~a~]:~%" format-string)
+	   (and (boundp' *clause*) *clause*)
+	   args)))
 
 
 (defun bug (format-string &rest args)
