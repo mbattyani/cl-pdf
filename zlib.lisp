@@ -85,7 +85,9 @@
 
 #+use-salza-zlib
 (defun compress-string (string)
-  (let* ((input (deflate::string-to-octets string 0 (length string)))
+  (let* ((input (if (stringp string)
+		    (deflate::string-to-octets string 0 (length string))
+		    string))
 	 (buffer-size (min 8192 (* 2 (length string))))
          (zlib-buffer (make-array buffer-size :element-type 'salza::octet))
          (chunks ()))

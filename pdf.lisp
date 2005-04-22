@@ -48,7 +48,7 @@
 			(let ((content (content obj)))
 			  (if (consp content)
 			      (reduce #'+ content :key #'length)
-			      (length (content obj))))))))
+			      (length content)))))))
 
 (defun compress-pdf-stream (pdf-stream)
   (when (and *compress-streams* (not (no-compression pdf-stream))
