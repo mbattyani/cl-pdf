@@ -173,6 +173,6 @@ BITSTREAM."
 
 ;;; Stub called from make-deflate-stream if di-huffman is not used.
 (defun initialize-huffman (&optional force)
-  (declare (ignore force))
+  (declare (ignore force)))
 
 
