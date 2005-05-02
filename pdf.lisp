@@ -85,25 +85,30 @@
     (let ((*document* doc))
       (setf (objects doc) (make-array 10 :fill-pointer 0 :adjustable t))
       (setf (catalog doc) (make-instance 'indirect-object))
-      (setf (docinfo doc) (make-instance 'indirect-object))
       (setf (root-page doc) (make-instance 'page-node))
       (setf (outline-root doc)(make-instance 'outline))
       (setf (content (catalog doc))
 	    (make-instance 'dictionary
 			   :dict-values `(("/Type" . "/Catalog")
 					  ("/Pages" . ,(root-page doc)))))
-      (setf (content (docinfo doc))
-            (make-instance 'dictionary
-                           :dict-values `(("/Creator" . ,(format nil "(cl-pdf ~A - ~A)" *version* creator))
-                                          ,@(when author `(("/Author" . ,(format nil "(~A)" author))))
-                                          ,@(when title `(("/Title" . ,(format nil "(~A)" title))))
-                                          ,@(when subject `(("/Subject" . ,(format nil "(~A)" subject))))
-                                          ,@(when keywords `(("/Keywords" . ,(format nil "(~A)" keywords))))
-                                          ("/CreationDate" .
-                                            ,(multiple-value-bind (second minute hour date month year)
-                                                 (get-decoded-time)
-                                              (format nil "(D:~D~2,'0D~2,'0D~2,'0D~2,'0D~2,'0D)"
-                                                      year month date hour minute second)))))))))
+      (add-doc-info doc :creator creator :author author 
+		    :title title :subject subject :keywords keywords)
+     )))
+
+(defun add-doc-info (doc &key (creator "") author title subject keywords)
+  (setf (docinfo doc) (make-instance 'indirect-object))
+  (setf (content (docinfo doc))
+	(make-instance 'dictionary
+		       :dict-values `(("/Creator" . ,(format nil "(cl-pdf ~A - ~A)" *version* creator))
+				      ,@(when author `(("/Author" . ,(format nil "(~A)" author))))
+				      ,@(when title `(("/Title" . ,(format nil "(~A)" title))))
+				      ,@(when subject `(("/Subject" . ,(format nil "(~A)" subject))))
+				      ,@(when keywords `(("/Keywords" . ,(format nil "(~A)" keywords))))
+				      ("/CreationDate" .
+                                          ,(multiple-value-bind (second minute hour date month year)
+					       (get-decoded-time)
+					     (format nil "(D:~D~2,'0D~2,'0D~2,'0D~2,'0D~2,'0D)"
+						     year month date hour minute second)))))))
 
 (defclass indirect-object ()
   ((obj-number :accessor obj-number :initform (incf (last-object-number *document*)) :initarg :obj-number)
@@ -503,8 +508,9 @@
 	     do (write-line xref s))
        (format s "trailer~%<< /Size ~d~%/Root " (length *xrefs*));(1- (length (objects document))))
        (write-object (catalog document))
-       (format s "/Info ")
-       (write-object (docinfo document))
+       (when (docinfo document)
+	 (format s " /Info ")
+	 (write-object (docinfo document)))
        (format s "~%>>~%startxref~%~d~%%%EOF~%" startxref))))
 
 (defmethod write-document ((filename pathname) &optional (document *document*))
