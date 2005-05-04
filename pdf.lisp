@@ -35,7 +35,10 @@
   (cdr (assoc name (dict-values dict) :test #'string=)))
 
 (defun change-dict-value (dict name value)
-  (setf (cdr (assoc name (dict-values dict) :test #'string=)) value))
+  (let ((key-val (assoc name (dict-values dict) :test #'string=)))
+    (if key-val
+	(setf (cdr key-val) value)
+	(add-dict-value dict name value))))
 
 (defclass pdf-stream (dictionary)
   ((content :accessor content :initform "" :initarg :content)
@@ -452,7 +455,7 @@
 			  *xrefs*)
       (format *pdf-stream* "~d ~d obj~%" (obj-number obj)(gen-number obj))
       (when (content obj)(write-object (content obj)))
-      (write-string "endobj" *pdf-stream*)
+      (write-string " endobj" *pdf-stream*)
       (write-char #\Newline *pdf-stream*))
     (format *pdf-stream* "~d ~d R" (obj-number obj)(gen-number obj))))
 

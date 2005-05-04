@@ -2,330 +2,432 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-;; see example at the end.
+;; Thanks to Arthur Lemmens for the recursive descent parser :)
+;; (It's much nicer than my original LALR parser ;-)
+;; See the example at the end for usage.
 
 (in-package pdf)
 
-#-use-cl-yacc
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (require "parsergen"))
+(defvar *pdf-input-stream* nil)
+(defvar *indirect-objects* nil)
 
-(defvar *pdf-read-stream* nil)
-(defvar *lex-val* nil)
-(defvar *force-eof* nil)
+(defun find-indirect-object (obj-number gen-number)
+  (let ((object.pos (gethash (cons obj-number gen-number) *indirect-objects*)))
+    (if object.pos
+	(values (car object.pos) (cdr object.pos))
+	(make-indirect-object obj-number gen-number 0))))
 
-(defclass raw-object (indirect-object)
-  ())
+(defun make-indirect-object (obj-number gen-number position)
+  (let ((object (or (car (gethash (cons obj-number gen-number) *indirect-objects*))
+		    (make-instance 'indirect-object
+				   :obj-number obj-number
+				   :gen-number gen-number
+				   :content :unread
+				   :no-link t))))
+    (setf (gethash (cons obj-number gen-number) *indirect-objects*) (cons object position))
+    object))
 
-(defmethod write-object ((obj raw-object) &optional root-level)
-  (if root-level
-    (progn
-      (vector-push-extend (format nil "~10,'0d ~5,'0d n "
-				  (file-position *pdf-stream*)(gen-number obj))
-			  *xrefs*)
-      (write-sequence (content obj) *pdf-stream*))
-    (format *pdf-stream* "~d ~d R" (obj-number obj)(gen-number obj))))
+(defun read-indirect-object (obj-number gen-number)
+  (multiple-value-bind (object position) (find-indirect-object obj-number gen-number)
+    (when (eq (content object) :unread)
+      (setf (content object) (read-indirect-object-content position)))
+    object))
 
-(defconstant +white-char+ (concatenate 'string '(#\Space #\Newline #\Return #\Tab #\Null #\Page)))
+(defun load-indirect-object (object)
+  (when (eq (content object) :unread)
+    (read-indirect-object (obj-number object) (gen-number object)))
+  object)
+
+(defun delete-indirect-object (object)
+  (remhash (cons (obj-number object) (gen-number object)) *indirect-objects*))
+
+(defun load-all-indirect-objects ()
+  (loop for object.pos being the hash-value of *indirect-objects*
+        do (load-indirect-object (car object.pos))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Parser
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-condition pdf-parse-error ()
+  ((stream :initarg :stream :reader pdf-parse-error-stream)
+   (message :initarg :message :reader pdf-parse-error-message))
+  (:report (lambda (condition stream)
+             (format stream "~&Error while reading PDF document.~%~A~%~A~%"
+                     (pdf-parse-error-message condition)
+                     (pdf-parse-error-stream condition)))))
+
+(defun unexpected-character-error (char)
+  (cerror "Ignore the character and continue."
+          'pdf-parse-error
+          :stream *pdf-input-stream*
+          :message (format nil "Unexpected character ~S." char)))
+
+(defconstant +white-char+ (coerce '(#\Space #\Newline #\Return #\Tab #\Null #\Page) 'string))
 
 (defun white-char-p (c)
   (find c +white-char+))
 
-(defun eat-comment ()
-  (loop for c = (read-char *pdf-read-stream* nil *pdf-read-stream*)
-	until (or (eq c *pdf-read-stream*)(eq c #\Newline))))
+(defun octal-digit-char-p (char)
+  (find char "01234567"))
 
-(defun eat-string ()
-  (let ((string (make-array 10 :adjustable t :fill-pointer 0
-			    :element-type 'standard-char)))
-    (vector-push-extend #\( string)
-    (loop with level = 1
-	  for c = (read-char *pdf-read-stream* nil *pdf-read-stream*)
-	  when  (eq c *pdf-read-stream*) return string
-	  when (char= c #\)) do (decf level)
-	  when (char= c #\() do (incf level)
-	  do (vector-push-extend c string)
-	  when (zerop level) return string)))
+(defun hex-digit-char-p (char)
+  (find char "0123456789ABCDEF"))
 
-(defun eat-stream (length)
-  (let ((stream (make-string length)))
-    (read-sequence stream *pdf-read-stream*)
-    stream))
+(defun numeric-char-p (char)
+  (find char "0123456789-."))
 
-(defun pdf-lex0 ()
-  (let ((string :eof))
-    (labels ((trig-char (c tc token)
-	       (when (char= c tc)
-		 (if (eq string :eof)
-		   (return-from pdf-lex0 token)
-		   (progn (unread-char c *pdf-read-stream*)
-			  (return-from pdf-lex0 string)))))
-	     (trig2-char (c1 c2 tc1 tc2 token)
-	       (when (and (char= c1 tc1)(char= c2 tc2))
-		 (if (or (eq string :eof) (= (length string) 1))
-		   (return-from pdf-lex0 token)
-		   (progn (unread-char c1 *pdf-read-stream*)(unread-char c2 *pdf-read-stream*)
-			  (return-from pdf-lex0 string))))))
-      (loop for prev-c = #\Space then c
-	    for c = (read-char *pdf-read-stream* nil *pdf-read-stream*)
-	    for eof = (eq c *pdf-read-stream*)
-	    for prev-white-char = t then white-char
-	    for white-char = (or eof (white-char-p c))
-	    when (or eof (and white-char (not prev-white-char))) do (return string)
-	    when (char= c #\%) do (eat-comment)(setf white-char t)
-	    when (char= c #\() do (setf *lex-val* (eat-string)) (return :string)
-	    do
-	    (trig-char c #\[ :start-array)
-	    (trig-char c #\] :end-array)
-	    (trig2-char c prev-c #\< #\< :start-dict)
-	    (trig2-char c prev-c #\> #\> :end-dict)
-	    when (and prev-white-char (not white-char))
-	    do (setf string (make-array 5 :adjustable t :fill-pointer 0
-					:element-type 'standard-char))
-	    unless white-char do (vector-push-extend c string)))))
+(defun name-char-p (char)
+  (and (<= #x21 (char-code char) #x7E)
+       (not (find char "%()<>[]{}/#"))))
 
-(defun pdf-lex ()
-  (if *force-eof*
-    nil
-    (let ((token (pdf-lex0)))
-      (cond
-	((eq token :eof) nil)
-	((symbolp token) (values token *lex-val*))
-	((every #'digit-char-p token)
-	 (setf *lex-val*(parse-integer token)) (values :integer (parse-integer token)))
-	((string= token "R") :R)
-	((string= token "n") :n)
-	((string= token "f") :f)
-	((string= token "obj") :obj)
-	((string= token "endobj") :endobj)
-	((string= token "stream") :stream)
-	((string= token "endstream") :endstream)
-	((string= token "startxref") nil)
-	((string= token "true")  :true)
-	((string= token "false") :false)
-	((string= token "xref") :xref)
-	((string= token "trailer") :trailer)
-	((string= token "null") :null)
-	(t (setf *lex-val* token) (values :token token))))))
+;;; Skipping characters
 
-(defun parse-pdf (file)
-  (with-open-file (s file :direction :input :external-format '(:default :eol-style :lf))
-    (parse-pdf-stream s)))
+(defun eat-char (expected-char)
+  (let ((char (read-char *pdf-input-stream*)))
+    (unless (char= char expected-char)
+      (cerror "Ignore the character and continue."
+              'pdf-parse-error
+              :stream *pdf-input-stream*
+              :message (format nil "Unexpected character ~S (expected ~S)."
+                               char expected-char)))))
 
-(defun parse-pdf-stream (*pdf-read-stream*)
-  (let ((file-length (file-length *pdf-read-stream*))
-	(trailer (make-string 100))
-	startxref startxref-pos)
-    (file-position *pdf-read-stream* (- file-length 100))
-    (read-sequence trailer *pdf-read-stream*)
-    (setf startxref-pos (search "startxref" trailer))
-    (when startxref-pos
-      (setf startxref (parse-integer trailer :start (+ startxref-pos 10) :junk-allowed t))
-      (file-position *pdf-read-stream* startxref)
-      (let* ((trailer (parse-trailer))
-	     (xrefs (first trailer))
-	     (trailer-dict (second trailer))
-	     (sorted-pos ())
-	     (last-object (get-dict-value trailer-dict "/Size"))
-	     (*document* (make-instance 'document :empty t))
-	     (objects (make-array (1+ last-object) :fill-pointer (1+ last-object) :adjustable t
-				  :initial-element nil)))
-	(loop with prev-trailer = nil and prev-trailer-dict = trailer-dict
-	   for prev-xref = (get-dict-value prev-trailer-dict "/Prev")
-	   while prev-xref do
-	     (file-position *pdf-read-stream* prev-xref)
-	     (setf prev-trailer (parse-trailer))
-	     (when prev-trailer 
-	       (setf xrefs (append (first prev-trailer) xrefs)
-		     prev-trailer-dict (second prev-trailer))))
+(defun eat-chars (chars)
+  (loop for char across chars
+        do (eat-char char)))
 
-	(setf (objects *document*) objects)
-	(setf sorted-pos (sort (list* startxref file-length (loop for (pos gen type) in xrefs
-							       when (eq type :n) collect pos)) #'<))
-	(loop with object-number = 0
-	   for (pos gen type) in xrefs
-	   do (case type
-		(:n (setf (aref objects object-number)
-			  (read-raw-object pos object-number gen sorted-pos))
-		    (incf object-number))
-		(:f (incf object-number))
-		(:start-table (setf object-number pos))))
-	(let* ((cat-number (obj-number (get-dict-value trailer-dict "/Root")))
-;	     (doc-info   (get-dict-value trailer-dict "/Info"))
-;	     (doc-info-number (when doc-info (obj-number doc-info)))
-	       (catalog (parse-raw-object (aref objects cat-number)))
-	       (pages-number (obj-number (get-dict-value (content catalog) "/Pages")))
-	       (pages (parse-raw-object (aref objects pages-number))))
-	  (setf pages (change-class pages 'page-node))
-	  (setf (pages pages) (get-dict-value (content pages) "/Kids"))
-	  (change-dict-value (content pages) "/Count" #'(lambda () (length (pages pages))))
-	  (setf (root-page *document*) pages)
-	  (setf (last-object-number *document*) last-object)
-	  (setf (catalog *document*) catalog))
-	*document*))))
+(defun eat-keyword (keyword)
+  (skip-whitespace t)
+  (eat-chars keyword)
+  (skip-whitespace t))
 
-(defun parse-trailer ()
-  (let ((*force-eof* nil))
-    #-use-cl-yacc (pdf-object-parser 'pdf-lex)
-    #+use-cl-yacc (yacc:parse-with-lexer 'pdf-lex *pdf-parser*)))
+(defun skip-whitespace (eof-error-p &key (skip-comments t))
+  (loop
+   (let ((char (read-char *pdf-input-stream* eof-error-p)))
+     (cond ((null char)
+            (return :eof))
+           ((and skip-comments (eql char #\%))
+            (loop for c = (read-char *pdf-input-stream* nil)
+                  until (or (null c) (eq c #\Newline))))
+           ((not (white-char-p char))
+            (unread-char char *pdf-input-stream*)
+            (return char))))))
 
-#+use-cl-yacc
-(eval-when (:compile-toplevel :load-toplevel)
-(defun convert-parser-to-cl-yacc (productions)
-  (flet ((make-arg-list (n)
-	   (loop for i from 1 to n collect (intern (format nil "$~d" i)))))
-    (loop with groupings = (list ())
-       for ((symbol . expansion) . body) in productions 
-       for arg-list = (make-arg-list (length expansion))
-       for yacc-production = `((,@expansion #'(lambda ,arg-list
-						(declare (ignorable ,@arg-list))
-						,@body)))
-       for previous-prod = (find symbol groupings :key #'first)
-       do (if previous-prod
-	      (setf (cdr (last previous-prod)) yacc-production)
-	      (setf (cdr (last groupings)) (list (cons symbol yacc-production))))
-       finally (return (rest groupings)))))
+;;; PDF Basic objects (see Chapter 4)
 
-(defmacro yacc-parser ((name &rest args) &rest productions)
-  `(yacc:define-parser ,name
-       ,@args 
-       ,@(convert-parser-to-cl-yacc productions))))
+(defun read-object (&optional (eof-error-p t))
 
-#+use-cl-yacc
-(yacc-parser (*pdf-parser*
-	      (:start-symbol pdf-data)
-	      (:terminals (:xref :trailer :n :f :obj :endobj :integer :token :start-dict :end-dict :name
-				 :string :true :false :start-array :end-array :r :endstream :stream)))
-  ((pdf-data trailer) $1)
-  ((pdf-data object) $1)
-  ((trailer :xref xrefs :trailer dictionary) (setf *force-eof* t)(list $2 $4))
-  ((xrefs xref xrefs) (cons $1 $2))
-  ((xrefs xref) (list $1))
-  ((xref integer integer xref-type) (list $1 $2 $3))
-  ((xref-type ) :start-table)
-  ((xref-type :n) :n)
-  ((xref-type :f) :f)
-  ((object number gen-number :obj content :endobj) (setf *force-eof* t)(list $1 $2 $4))
-  ((number integer) $1)
-  ((gen-number integer) $1)
-  ((content val) $1)
-  ((integer :integer) $1)
-  ((token :token) $1)
-  ((dictionary :start-dict key-val* :end-dict) (%make-dictionary $2))
-  ((dictionary :start-dict :end-dict) (%make-dictionary nil))
-  ((key-val* key-val key-val*) (cons $1 $2))
-  ((key-val* key-val) (list $1))
-  ((key-val key val) (cons $1 $2))
-  ((key-val key object-ref) (cons $1 $2))
-  ((key token) $1)
-  ((val token) $1)
-  ((val integer) $1)
-  ((val :name) $1)
-  ((val :string) $1)
-  ((val :true) :true)
-  ((val :false) :false)
-  ((val stream) $1)
-  ((val dictionary) $1)
-  ((val array) $1)
-  ((array :start-array values :end-array) (convert-to-array $2))
-  ((array :start-array :end-array) (vector))
-  ((values val values) (cons $1 $2))
-  ((values :r values) (cons :r $2))
-  ((values val) (list $1))
-  ((values :r) (list :r))
-  ((stream  start-stream :endstream) $1)
-  ((start-stream :start-dict key-val* :end-dict :stream)(%make-stream $2))
-  ((object-ref integer integer :R) (%make-obj-ref $1 $2)))
+  "Returns one of the following PDF objects: boolean (:true or :false),
+number (Lisp number), string (Lisp string), name (Lisp symbol in the PDF
+package), array (Lisp vector), dictionary (Lisp property list), stream
+(Lisp pdf-stream) or null (Lisp NIL). When EOF-ERRORP is nil, it returns
+:eof for the end of the stream (otherwise it signals an error)." 
+  (skip-whitespace eof-error-p)
+  (let ((char (peek-char nil *pdf-input-stream* eof-error-p)))
+    (cond ((numeric-char-p char)
+           (read-number))
+          ((eql char #\()
+           (eat-char #\()
+           (read-pdf-string))
+          ((eql char #\/)
+           (eat-char #\/)
+           (read-name ))
+          ((eql char #\[)
+           (eat-char #\[)
+           (read-array))
+          ((eql char #\<) 
+           (eat-char #\<)
+           (let ((next-char (peek-char nil *pdf-input-stream*)))
+             (if (char= next-char #\<) 
+                 (progn (eat-char #\<)
+                   (read-dictionary-or-stream))
+               (read-hex-string))))
+          ((eql char #\t)
+           (eat-chars "true")
+           "true")
+          ((eql char #\f)
+           (eat-chars "false")
+           "false")
+          ((eql char #\n)
+           (eat-chars "null")
+           nil)
+          (t (unexpected-character-error char)))))
 
-#-use-cl-yacc
-(parsergen:defparser pdf-object-parser
-  ((Start pdf-data) $1)
-  ((pdf-data trailer) $1)
-  ((pdf-data object) $1)
-  ((trailer :xref xrefs :trailer dictionary) (setf *force-eof* t)(list $2 $4))
-  ((xrefs xref xrefs) (cons $1 $2))
-  ((xrefs xref) (list $1))
-  ((xref integer integer xref-type) (list $1 $2 $3))
-  ((xref-type ) :start-table)
-  ((xref-type :n) :n)
-  ((xref-type :f) :f)
-  ((object number gen-number :obj content :endobj) (setf *force-eof* t)(list $1 $2 $4))
-  ((number integer) $1)
-  ((gen-number integer) $1)
-  ((content val) $1)
-  ((integer :integer) *lex-val*)
-  ((token :token) *lex-val*)
-  ((dictionary :start-dict key-val* :end-dict) (%make-dictionary $2))
-  ((dictionary :start-dict :end-dict) (%make-dictionary nil))
-  ((key-val* key-val key-val*) (cons $1 $2))
-  ((key-val* key-val) (list $1))
-  ((key-val key val) (cons $1 $2))
-  ((key-val key object-ref) (cons $1 $2))
-  ((key token) $1)
-  ((val token) $1)
-  ((val integer) $1)
-  ((val :name) *lex-val*)
-  ((val :string) *lex-val*)
-  ((val :true) :true)
-  ((val :false) :false)
-  ((val stream) $1)
-  ((val dictionary) $1)
-  ((val array) $1)
-  ((array :start-array values :end-array) (convert-to-array $2))
-  ((array :start-array :end-array) (vector))
-  ((values val values) (cons $1 $2))
-  ((values :r values) (cons :r $2))
-  ((values val) (list $1))
-  ((values :r) (list :r))
-  ((stream  start-stream :endstream) $1)
-  ((start-stream :start-dict key-val* :end-dict :stream)(%make-stream $2))
-  ((object-ref integer integer :R) (%make-obj-ref $1 $2)))
+(defun read-number ()
+  (read-from-string
+   (with-output-to-string (s)
+     (loop for char = (read-char *pdf-input-stream* nil nil)
+           until (or (null char) (not (numeric-char-p char)))
+           do (write-char char s)
+           finally (when char
+                     (unread-char char *pdf-input-stream*))))))
 
-(defun %make-stream (key-vals)
-  (let ((dict (make-instance 'pdf-stream :empty t)))
-    (setf (dict-values dict) key-vals)
-    (setf (content dict) (eat-stream (get-dict-value dict "/Length")))
-    dict))
+;;; Strings
 
-(defun %make-dictionary (key-vals)
-  (make-instance 'dictionary :dict-values key-vals))
+(defun read-pdf-string ()
+  ;; TODO: Deal with encodings.
+  (with-output-to-string (s)
+    (write-char #\( s)
+    (loop for prev-char = #\( then char
+          for char = (read-char *pdf-input-stream*)
+          until (and (char= char #\))(not (char= prev-char #\\)))
+	  do (write-char char s))
+    (write-char #\) s)))
 
-(defun %make-obj-ref (obj-number gen-number)
-  (make-instance 'object-ref :obj-number obj-number :gen-number gen-number))
+(defun read-hex-string ()
+  (with-output-to-string (s)
+    (write-char #\< s)
+    (loop for char = (read-char *pdf-input-stream*)
+       until (char= char #\>)
+       do (write-char char s))
+    (write-char #\> s)))
 
-(defun convert-to-array (values)
-  (loop with array = (make-array 10 :fill-pointer 0 :adjustable t) and gen and in-ref
-	for val in (nreverse values)
-	when (eq in-ref :gen) do (setf val (%make-obj-ref val gen))(setf in-ref nil)
-	when (eq in-ref :r) do (setf gen val)(setf in-ref :gen)
-	when (eq val :r) do (setf in-ref :r)
-	unless in-ref do (vector-push-extend val array)
-	finally return (nreverse array)))
+(defun parse-hex (digit-1 digit-2)
+  (flet ((parse-digit (digit)
+           (- (char-code digit)
+              (char-code (if (char<= #\0 digit #\9) #\0 #\A)))))
+    (+ (* 16 (parse-digit (char-upcase digit-1)))
+       (parse-digit (char-upcase digit-2)))))
 
-(defun parse-object (position)
-  (file-position *pdf-read-stream* position)
-  (let* ((*force-eof* nil)
-	 (data #-use-cl-yacc (pdf-object-parser 'pdf-lex)
-	       #+use-cl-yacc (yacc:parse-with-lexer 'pdf-lex *pdf-parser*))
-	 (object (aref (objects *document*) (first data)))
-	 (content (third data))
-	 dict)
-    (setf (gen-number object) (second data))
-    (setf (content object) content)
-    ))
+;;; Names
 
-(defun parse-raw-object (raw-obj)
-  (let ((obj-num (obj-number raw-obj)))
-    (when (typep raw-obj 'object-ref)
-      (setf raw-obj (aref (objects *document*) obj-num)))
-    (with-input-from-string (*pdf-read-stream* (content raw-obj))
-      (let* ((*force-eof* nil)
-	     (data #-use-cl-yacc (pdf-object-parser 'pdf-lex)
-		   #+use-cl-yacc (yacc:parse-with-lexer 'pdf-lex *pdf-parser*))
-	     (new-obj (make-instance 'indirect-object :no-link t :obj-number obj-num
-				     :gen-number (gen-number raw-obj) :content (third data))))
-	(setf (aref (objects *document*) obj-num) new-obj)
-	new-obj))))
+(defun read-name ()
+  (with-output-to-string (s)
+    (write-char #\/ s)
+    (loop (let ((char (read-char *pdf-input-stream* nil nil)))
+	    (cond ((null char) (return))
+		  ((eql char #\#)
+		   (let ((digit-1 (read-char *pdf-input-stream*))
+			 (digit-2 (read-char *pdf-input-stream*)))
+		     (unless (and (hex-digit-char-p digit-1)
+				  (hex-digit-char-p digit-2))
+		       (error 'pdf-parse-error
+			      :stream *pdf-input-stream*
+			      :message "Illegal hexadecimal escape sequence in PDF name."))
+		     (write-char (code-char (parse-hex digit-1 digit-2))
+				 s)))
+		  ((name-char-p char)
+		   (write-char char s))
+		  (t (unread-char char *pdf-input-stream*)
+		     (return)))))))
+
+;;; Arrays
+
+(defun read-array ()
+  ;; #\[ has already been read
+  (let ((stack '()))
+    (loop (skip-whitespace t)
+          (let ((char (peek-char nil *pdf-input-stream*)))
+            (case char
+              ( #\]
+                (eat-char #\])
+                (return))
+              ( #\R
+                (eat-char #\R)
+                ;; Reduce last two numbers to indirect-reference
+                (let ((generation-number (pop stack))
+                      (object-number (pop stack)))
+                  (assert (integerp generation-number))
+                  (assert (integerp object-number))
+                  (push (find-indirect-object object-number generation-number) stack)))
+              (otherwise
+               (push (read-object) stack)))))
+    (make-array (length stack)
+                :initial-contents (nreverse stack))))
+
+;;; Dictionaries and streams
+
+(defun read-dictionary-properties ()
+  (let ((plist '()))
+    (loop (skip-whitespace t)
+          (let ((char (peek-char nil *pdf-input-stream*)))
+            (case char
+              ( #\>
+                (eat-chars ">>")
+                (return))
+              ( #\R
+                (eat-char #\R)
+                ;; Reduce last two numbers to indirect-object
+                (let ((generation-number (pop plist))
+                      (object-number (pop plist)))
+                  (assert (integerp generation-number))
+                  (assert (integerp object-number))
+                  (push (find-indirect-object object-number generation-number) plist)))
+              (otherwise
+               (push (read-object t)
+                     plist)))))
+    (loop for (k v . rest) on (nreverse plist) by #'cddr
+          collect (cons k v))))
+
+(defun read-dictionary ()
+  (make-instance 'dictionary :dict-values (read-dictionary-properties)))
+
+(defun read-dictionary-or-stream ()
+  (let ((properties (read-dictionary-properties)))
+    ;; Check if dictionary is followed by a stream
+    (skip-whitespace nil)
+    (let ((char (peek-char nil *pdf-input-stream* nil nil)))
+      (cond ((eql char #\s)
+             ;; Don't use EAT-KEYWORD here, because it may eat too many newlines!
+             (eat-chars "stream") 
+             (read-line *pdf-input-stream*)
+             (read-pdf-stream properties))
+            (t (make-instance 'dictionary :dict-values properties))))))
+
+(defun read-pdf-stream (properties)
+  (let ((length (cdr (assoc "/Length" properties :test #'string=))))
+    (when (typep length 'indirect-object)
+      (let ((saved-filepos (file-position *pdf-input-stream*)))
+        (setq length (content (load-indirect-object length)))
+        (file-position *pdf-input-stream* saved-filepos)))
+    (assert (integerp length))
+    (let ((content (loop repeat (ceiling length array-total-size-limit)
+		      for buffer-size = (min length array-total-size-limit)
+		      ;; while (plusp buffer-size)
+		      collect (let* ((buffer (make-string buffer-size))
+				     (bytes-read (read-sequence buffer *pdf-input-stream*)))
+				(when (< bytes-read buffer-size)
+				  (error 'pdf-parse-error
+					 :stream *pdf-input-stream*
+					 :message "Unexpected end of PDF-stream."))
+				buffer)
+		      do (decf length buffer-size))))
+      (eat-keyword "endstream")
+      (make-instance 'pdf-stream :dict-values properties :content content :no-compression t))))
+
+;;; Integers
+
+(defun read-integer ()
+  (let ((object (read-object)))
+    (unless (integerp object)
+      (error 'pdf-parse-error 
+             :stream *pdf-input-stream*
+             :message "Integer expected."))
+    object))
+
+;;; Indirect objects
+
+(defun read-indirect-object-content (file-position)
+  (file-position *pdf-input-stream* file-position)
+  (let* ((object-number (read-integer))
+         (generation-number (read-integer)))
+    (eat-keyword "obj")
+    (let ((object (read-object)))
+      ;; Some producers forget the "endobj" at the end of a stream
+      ;; Let's try to be tolerant.
+      (skip-whitespace t)
+      (when (char= #\e (peek-char nil *pdf-input-stream*))
+        (eat-keyword "endobj"))
+      object)))
+
+;;; xref
+
+(defun read-xref-and-trailer (position)
+  (let (first-trailer)
+    (loop
+       (read-cross-reference-subsections position)
+       (let* ((trailer (read-trailer)))
+	 (unless first-trailer (setf first-trailer trailer))
+	 (let ((prev-position (get-dict-value trailer "/Prev")))
+	   (if prev-position
+	       (setq position prev-position)
+	       (return first-trailer)))))))
+
+(defun read-cross-reference-subsections (position)
+  (file-position *pdf-input-stream* position)
+  (eat-keyword "xref")
+  (loop
+     (let ((char (peek-char nil *pdf-input-stream*)))
+       (cond ((char= char #\t) (return))
+             (t (read-cross-reference-subsection))))))
+
+(defun read-cross-reference-subsection ()
+  (let ((first-entry (read-integer))
+        (nr-entries (read-integer)))
+    (loop repeat nr-entries
+	  for number from first-entry
+          do (read-cross-reference-entry number))))
+
+(defun read-cross-reference-entry (number)
+  (let ((position (read-integer)))
+    (skip-whitespace nil)
+    (let ((gen (read-integer)))
+      (skip-whitespace nil)
+      (let ((type (read-char *pdf-input-stream*)))
+        (skip-whitespace nil)
+        (if (char= type #\n)
+	    (make-indirect-object number gen position))))))
+
+(defun read-trailer ()
+  (eat-keyword "trailer")
+  (skip-whitespace t)
+  (eat-chars "<<")
+  (read-dictionary))
+
+(defun find-cross-reference-start ()
+  (let ((file-length (file-length *pdf-input-stream*))
+        (buffer (make-string 100)))
+    (file-position *pdf-input-stream* (- file-length 100))
+    (read-sequence buffer *pdf-input-stream*)
+    (let ((position (search "startxref" buffer)))
+      (unless position
+        (error 'pdf-parse-error :stream *pdf-input-stream*
+               :message "Can't find start address of cross-reference table."))
+      (parse-integer buffer :start (+ position 10) :junk-allowed t))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Higher level Stuff
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun renumber-all-indirect-objects ()
+  "Gives all indirect objects a consecutive numbering.
+Returns the first unused object-number."
+  (let ((objects (make-array (hash-table-count *indirect-objects*)
+			     :fill-pointer 0 :adjustable t
+			     :initial-element nil)))
+    (setf (objects *document*) objects)
+    (setf (last-object-number *document*) (hash-table-count *indirect-objects*))
+    (loop for object.pos being the hash-value of *indirect-objects*
+	  for object = (car object.pos)
+          for number from 1 do
+	 (setf (obj-number object) number
+	       (gen-number object) 0)
+	 (vector-push-extend object objects))))
+
+(defun read-pdf-file (file)
+  (let ((*indirect-objects* (make-hash-table :test #'equal))
+	(*document* (make-instance 'document :empty t)))
+    (with-open-file (*pdf-input-stream* file
+		     :direction :input
+		     :external-format +external-format+)
+      (read-pdf))
+    *document*))
+
+(defun collect-pages (page pages-vector root-page-node)
+  (if (string= (get-dict-value (content page) "/Type") "/Pages")
+      (progn
+	(loop for kid-page across (get-dict-value (content page) "/Kids")
+  	      do (collect-pages kid-page pages-vector root-page-node))
+	(unless (eq page root-page-node) (delete-indirect-object page)))
+      (progn
+	(unless (eq page root-page-node)
+	  (change-dict-value (content page) "/Parent" root-page-node))
+	(vector-push-extend page pages-vector))))
+
+(defun read-pdf ()
+  (let* ((trailer (read-xref-and-trailer (find-cross-reference-start)))
+	 (%visited-object% (make-hash-table :test #'eql)))
+    (setf (catalog *document*) (get-dict-value trailer "/Root")
+          (docinfo *document*) (get-dict-value trailer "/Info"))
+    (load-all-indirect-objects)
+    (let* ((root-page-node (change-class (get-dict-value (content (catalog *document*)) "/Pages") 'page-node))
+	   (pages-vector (make-array 1 :fill-pointer 0 :adjustable t)))
+      (collect-pages root-page-node pages-vector root-page-node)
+      (setf (pages root-page-node) pages-vector)
+      (change-dict-value (content root-page-node) "/Count" #'(lambda () (length (pages root-page-node))))
+      (change-dict-value (content root-page-node) "/Kids" (pages root-page-node))
+      (renumber-all-indirect-objects)
+      (setf (root-page *document*) root-page-node))))
 
 (defvar *original-content* nil)
 (defvar *current-content* nil)
@@ -345,26 +447,30 @@
 
 (export 'insert-original-page-content)
 
+(defun ensure-dictionary (obj)
+  (if (typep obj 'indirect-object)
+      (content obj)
+      obj))
+
 (defun open-page (page-num)
-  (let* ((page-obj-num (obj-number (aref (pages *root-page*) page-num)))
-	 (page (parse-raw-object (aref (objects *document*) page-obj-num)))
+  (let* ((page (aref (pages *root-page*) page-num))
 	 (dict (content page))
-	 (resources (get-dict-value dict "/Resources")))
-    (when (typep resources 'object-ref)
-      (let* ((ref-obj-num (obj-number resources)))
-	(setf resources (content (parse-raw-object resources)))))
-    (let ((fonts (get-dict-value resources "/Font"))
-	  (xobjects (get-dict-value resources "/Font"))
+	 (resources (ensure-dictionary (get-dict-value dict "/Resources"))))
+    (let ((fonts (ensure-dictionary (get-dict-value resources "/Font")))
+	  (xobjects (ensure-dictionary (get-dict-value resources "/XObject")))
 	  (content-stream (make-instance 'pdf-stream)))
       (setf *original-content* (get-dict-value dict "/Contents"))
       (setf *current-content* (make-array 10 :fill-pointer 0 :adjustable t ))
       (change-class page 'page)
+      (unless resources
+	(setf resources (make-instance 'dictionary)))
+      (change-dict-value dict "/Resources" resources)
       (unless fonts
-	(setf fonts (make-instance 'dictionary))
-	(push (cons "/Font" fonts) (dict-values resources)))
+	(setf fonts (make-instance 'dictionary)))
+      (change-dict-value resources "/Font" fonts)
       (unless xobjects
-	(setf xobjects (make-instance 'dictionary))
-	(push (cons "/XObject" xobjects) (dict-values resources)))
+	(setf xobjects (make-instance 'dictionary)))
+      (change-dict-value resources "/XObject" xobjects)
       (setf (bounds page)(get-dict-value dict "/MediaBox")
 	    (resources page) resources
 	    (font-objects page) fonts
@@ -373,17 +479,8 @@
       (change-dict-value dict "/Contents" *current-content*))
     page))
 
-(defun read-raw-object (position number gen sorted-positions)
-  (file-position *pdf-read-stream* position)
-  (let* ((last-pos (find position sorted-positions :test #'<))
-	 (length (- last-pos position))
-	 (content (make-string length)))
-    (read-sequence content *pdf-read-stream*)
-    (make-instance 'raw-object :content content :no-link t
-		   :obj-number number :gen-number gen)))
-
 (defmacro with-existing-document ((file &key (creator "") author title subject keywords) &body body)
-  `(let* ((*document* (parse-pdf ,file))
+  `(let* ((*document* (read-pdf-file ,file))
 	  (*root-page* (root-page *document*))
 	  (*page-number* 0))
      (add-doc-info *document* :creator ,creator :author ,author
@@ -398,7 +495,6 @@
 	  (*page* (open-page ,page-number)))
      (setf (content (content-stream *page*))
 	   (let ((*page-stream* (make-string-output-stream)))
-	     (declare (dynamic-extent pdf::*page-stream*))
 	     ,@body
 	     (vector-push-extend
 	      (make-instance 'indirect-object :content 
@@ -407,7 +503,6 @@
 	      *current-content*)))))
 
 (export 'with-existing-page)
-
 
 #|
 
@@ -419,13 +514,9 @@
        (pdf:move-text 95 700)
        (pdf:draw-text "cl-pdf-parser example"))
       (pdf:with-saved-state
-	  (pdf:translate 100 100)
+	  (pdf:translate 200 60)
 	(pdf:scale 0.7 0.7)
-	(pdf:rotate 0)
-	(pdf:insert-original-page-content)
-	(pdf:translate 100 100)
-	(pdf:scale 0.5 0.5)
-	(pdf:rotate 30)
+	(pdf:rotate 15)
 	(pdf:insert-original-page-content))
       (pdf:translate 230 400)
       (loop repeat 170
