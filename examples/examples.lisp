@@ -1,4 +1,4 @@
-;;; cl-pdf copyright 2002 Marc Battyani see license.txt for details of the BSD style license
+;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for details of the BSD style license
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -12,13 +12,14 @@
 	   (pdf:move-text 100 800)
 	   (pdf:draw-text "cl-pdf: Example 1"))
 	  (pdf:translate 230 500)
-	  (loop repeat 101
-	    for i = 0.67 then (* i 1.045)
-	    do (pdf:in-text-mode
-		(pdf:set-font helvetica i)
-		(pdf:move-text (* i 3) 0)
-		(pdf:draw-text "rotation"))
-	    (pdf:rotate 18)))))
+	  (loop repeat 150
+	 for i = 0.67 then (* i 1.045)
+	 do (pdf:in-text-mode
+	     (pdf:set-font helvetica i)
+	     (pdf:set-rgb-fill (/ (random 255) 255.0)(/ (random 255) 255.0)(/ (random 255) 255.0))
+	     (pdf:move-text (* i 3) 0)
+	     (pdf:draw-text "cl-typesetting"))
+	   (pdf:rotate 13)))))
     (pdf:write-document file)))
 
 (defun example2 (&optional (file #P"/tmp/ex2.pdf"))
@@ -362,20 +363,16 @@
 (defun vk-fractal (l level)
   (pdf:with-saved-state
       (if (zerop level)
-	  (progn 
-	    (pdf:move-to 0 0)
-	    (pdf:line-to l 0)
-	    (pdf:stroke))
-	  (let((l3 (/ l 3.0))
-	       (level (1- level)))
-	    (vk-fractal l3 level)
-	    (pdf:rotate 60)
-	    (vk-fractal l3 level)
-	    (pdf:rotate -120)
-	    (vk-fractal l3 level)
-	    (pdf:rotate 60)
-	    (vk-fractal l3 level))))
+          (progn 
+            (pdf:move-to 0 0)
+            (pdf:line-to l 0)
+            (pdf:stroke))
+          (loop with l3 = (/ l 3.0) and l-1 = (1- level)
+                for angle in '(nil 60 -120 60)
+                do (when angle (pdf:rotate angle))
+                   (vk-fractal l3 l-1))))
   (pdf:translate l 0))
+
 
 (defun example8 (&optional (file #P"/tmp/ex8.pdf"))
   (pdf:with-document ()
@@ -390,5 +387,116 @@
                    (pdf:translate 42 530)
 		   (pdf:set-line-width 0.1)
 		   (vk-fractal 510 i)(pdf:rotate -120)(vk-fractal 510 i)(pdf:rotate -120)(vk-fractal 510 i)))))
+    (pdf:write-document file)))
+
+;;; A Mandelbrot set from Yannick Gingras
+
+(defun hsv->rgb (h s v)
+  "channels are in range [0..1]"
+  (if (eql 0 s)
+      (list v v v)
+      (let* ((i (floor (* h 6)))
+             (f (- (* h 6) i))
+             (p (* v (- 1 s)))
+             (q (* v (- 1 (* s f))))
+             (t_ (* v (- 1 (* s (- 1 f)))))
+             (hint (mod i 6)))
+        (case hint
+          (0 (list v t_ p))
+          (1 (list q v p))
+          (2 (list p v t_))
+          (3 (list p q v))
+          (4 (list t_ p v))
+          (5 (list v p q))))))
+
+(defun make-color-map (nb-col
+		       start-rad
+		       &optional
+		       stop-rad
+		       (sat .85)
+		       (tilt-angle 0)
+		       (nb-loop 1)
+		       (clockwise t))
+  ;; borowed from Poly-pen --YGingras
+  (let* ((stop-rad (if stop-rad stop-rad start-rad))
+         (angle-inc (* (if clockwise 1.0 -1.0) nb-loop))
+         (val-inc (- stop-rad start-rad)))
+    (coerce (loop for k from 0 to (1- nb-col) collect
+		  (let ((i (/ k (1- nb-col))))
+		    (mapcar #'(lambda (x) (round x 1/255))
+			    (hsv->rgb (mod (+ tilt-angle (* i angle-inc)) 1)
+				      sat
+				      (+ start-rad (* i val-inc))))))
+            'vector)))
+
+
+(defun gen-mandelbrot-bits (w h)
+  ;; Inside a Moth by Lahvak, for other interesting regions see 
+  ;;     http://fract.ygingras.net/top
+
+  ;; TODO:AA
+  (declare (optimize speed (debug 0) (safety 0) (space 0))
+	   (type fixnum w h))
+  (let* ((nb-cols 30000)
+	 (nb-iter (expt 2 11)) ;; crank this if you have a fast box
+	 (center #c(-0.7714390420105d0 0.1264514778485d0))
+	 (zoom (* (expt (/ h 320) 2) 268436766))
+	 (inc (/ h (* 150000d0 zoom)))
+	 (cols (make-color-map nb-cols 1 0.2 0.9 0.24 0.21 t))
+	 (c #c(0d0 0d0))
+	 (z #c(0d0 0d0))
+	 (region nil)) 
+    (declare (type double-float inc))
+    (dotimes (i h)
+      (dotimes (j w)
+	(setf c (complex (+ (realpart center) 
+			    (* inc (+ (the fixnum j) (/ w -2d0))))
+			 (+ (imagpart center) 
+			    (* inc (+ (the fixnum i) (/ h -2d0)))))
+	      z #c(0d0 0d0))
+	;; standard Mandelbrot Set formula
+	(push (dotimes (n nb-iter 0)
+		(setf z (+ (* z z) c))
+		(let ((real (realpart z))
+		      (imag (imagpart z)))
+		  (when (< 2 (abs z))
+		    (return (- nb-iter 
+			       ;; sub-iter smoothing
+			       (- n (log (log (abs (+ (* z z) c)) 10) 2)))))))
+	      region)))
+    (with-output-to-string (s)
+      (let ((max (reduce #'max region)))
+	(dolist (x (nreverse region))
+	  (destructuring-bind (r g b) 
+	      (if (zerop x)
+		  '(0 0 0)
+		  ;; pallette stretching
+		  (elt cols (floor (expt (/ x max) (/ nb-iter 256)) 
+				   (/ 1 (1- nb-cols)))))
+	    (format s "~2,'0x~2,'0x~2,'0x" r g b)))))))
+
+;;; Example 9 is a Mandelbrot set from Yannick Gingras
+;;; Takes a long time...
+
+(defun example9 (&optional (file #P"/tmp/ex9.pdf"))
+  "draw a nice region of the Mandelbrot Set"
+  (pdf:with-document ()
+    (pdf:with-page ()
+      (pdf:with-outline-level ("Example" (pdf:register-page-reference))
+	(let* ((w 600)
+	       (h 750)
+	       (helvetica (pdf:get-font "Helvetica"))
+	       (image (make-instance 'pdf:image
+				     :bits (gen-mandelbrot-bits w h) 
+				     :width w :height h)))
+	  (pdf:add-images-to-page image)
+	  (pdf:in-text-mode
+	    (pdf:set-font helvetica 36.0)
+	    (pdf:move-text 100 800)
+	    (pdf:draw-text "cl-pdf: Example 9"))
+	  (pdf:with-saved-state
+	      (pdf:translate 0 0)
+	    (pdf:scale (/ w 2) (/ h 2))
+	    (pdf:paint-image image)))))
     (pdf:write-document file)))
 
