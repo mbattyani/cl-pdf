@@ -1,10 +1,8 @@
-;;; cl-pdf copyright 2002-2003 Marc Battyani see license.txt for the details
-;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
-;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
-
-;;;; Touched: <18-Nov-03 09:23:16 IST, madhu>
-;;; pk file parsing by Suresh Madhu
-
+;;; -*- Mode: LISP; Package: :cl-user; BASE: 10; Syntax: ANSI-Common-Lisp; -*-
+;;;
+;;;   Touched: Sat Oct 22 07:46:04 2005 +0530 <enometh@meer.net>
+;;;   Time-stamp: <05/10/22 08:12:22 madhu>
+;;;
 ;;;; vim: ft=lisp
 ;;;; Touched: <26-Sep-03 03:42:39 IST, madhu>
 ;;;;
@@ -17,11 +15,14 @@
 
 (defpackage "PK"
   (:use "CL")
-  (:export "PKTYPE"))
+  (:export "PKTYPE"
+	   "GET-PKFILE"
+	   "PK-FONT-SIZE"
+	   "PK-FONT-SCALE"
+	   "PK-CHAR-WIDTH"
+	   "PK-FONT-NAME"
+	   "PK-CHAR-DETAILS"))
 (in-package "PK")
-
-(export '(GET-PKFILE PK-FONT-SIZE PK-FONT-SCALE PK-CHAR-WIDTH
-                     PK-FONT-NAME PK-CHAR-DETAILS))
 
 (defvar *pk-file-stream* nil) ; stream of (unsigned-byte 8) elements
 
@@ -63,7 +64,7 @@
 
 (defun say (&rest args) (apply #'format t args))
 
-;; this speeds things up
+;; XXX this speeds things up
 #-nil
 (defmacro say (&rest args) (declare (ignore args)))
 
@@ -82,7 +83,7 @@
     (declare (ignorable design-size)) ;XXX
     (setf *%font-dsize* (/ design-size 1048576.0))
     (say "Design size = ~a~&" design-size))
-  (let ((check-sum get-32)) 
+  (let ((check-sum get-32))
     (declare (ignorable check-sum))
     (say "Checksum = ~a~&" check-sum))
   (let ((hppp get-32) ; horizontal resolution, points per inch, and
@@ -97,7 +98,7 @@
   (cond ((= flagbyte +pk-no-op+)
 	 (say "~a:  No op~&" (1- pk-loc)))
 	((= flagbyte +pk-yyy+)
-	 (let ((c get-32)) 
+	 (let ((c get-32))
 	   (declare (ignorable c))
 	   (say "~a:  Num Special: ~a~&" (1- pk-loc) c)));bug
 	((member flagbyte +pk-xxx+ :test #'eql)
@@ -234,13 +235,16 @@
 			  (say "*"))
 		      (t (say ".")))
 		(decf p-bit)
-		(when (zerop p-bit)
+		(when (< p-bit 0)
 		  (setf (aref raster p) b) (incf p)
 		  (setf p-bit 7 b 0)))
 	  (unless (= p-bit 7)
-	    (setf (aref raster p) b)) ; loop resets rest
+	    (setf (aref raster p) b)
+	    (incf p)) ; loop resets rest
 	  (say "~%"))
-    (assert (= p rastersize))))
+    (assert (= p rastersize) ()
+	    "~D mismatch rastersize ~D" p rastersize)))
+
 
 (defvar *term-pos*)
 
@@ -278,7 +282,7 @@
 (defun  create-normally-packed-raster (ch)
   (setf *term-pos* 2)
   (say "  ")
-  (with-slots (height width turn-on dyn-f turn-on raster p-bit p b rw) ch
+  (with-slots (height width turn-on dyn-f raster p-bit p b rw) ch
     (let ((rows-left height) (h-bit width) (repeat-count 0))
       (declare (special repeat-count))
       (assert (= 0 b))
@@ -364,45 +368,61 @@
 #+nil
 (pk:pktype  #p"skt/sktbs10.864pk")
 
-;;; 
+;;;
 ;;;
 ;;; afterthought: caching wrapper around pktype
 
-(defclass pkfile() 
+(defclass pkfile()
   ((font-size :accessor pk-font-size :initarg font-size)
    (font-name :accessor pk-font-name :initarg font-name)
    (resolution :accessor pk-resolution :initarg resolution) ;; points/inch
    (font-scale :accessor pk-font-scale)
    (chars :accessor chars :initarg chars)))
 
+(defmacro round-to ((digits) value)
+  "round VALUE to DIGITS decimal places"
+  (check-type digits (integer 0 10))
+  (let ((var (gensym)) (precision (expt 10 digits)))
+    `(let ((,var ,value))
+       (if (integerp ,var) ,var
+	 (coerce (/ (round (* ,precision ,var)) ,precision) 'single-float)))))
+
+#+nil
+(pprint (macroexpand-1 '(round-to (3) pi)))
+
 (defmethod initialize-instance :after ((pkfile pkfile) &rest initargs &key &allow-other-keys)
   (declare (ignore initargs))
   (setf (slot-value pkfile 'font-scale)
-        (/ .01 (/ (pk-resolution pkfile) (pk-font-size pkfile)))))
-                               
+        (round-to (5)
+		  (/ .01 (/ (pk-resolution pkfile) (pk-font-size pkfile))))))
+
 (defmethod pk-char-width ((pkfile pkfile) (car integer)) ; points/inch
-  (check-type car (integer 0 256))
+  (check-type car (integer 0 255))
   (let ((tfm-width (/ (slot-value (aref (chars pkfile) car) 'tfm-width)
-                      1048576.0)))
-    (/ tfm-width (pk-font-scale pkfile))))
-(let ((pkhash (make-hash-table :test #'equal))) ; XXX cache
-(defmethod get-pkfile ((pkfile pathname)) 
-  (let ((p (gethash (truename pkfile) pkhash)))
-    (cond (p (warn "load-pk-font: ~s already loaded" pkfile) p)
-          (t (let ((*%chars* (make-array 256)) *%font-dsize* *%resolution*)
+                      1048576)))
+    (round-to (2)
+	      (/ tfm-width (pk-font-scale pkfile)))))
+
+(defvar *pkhash* (make-hash-table :test #'equal)) ; XXX cache
+
+(defmethod get-pkfile ((pkfile pathname) &optional (reread nil))
+  (let ((p (gethash (truename pkfile) *pkhash*)))
+    (cond ((and (not reread) p)
+	   (warn "load-pk-font: ~s already loaded: ~s" pkfile p) p)
+          (t (when p
+	       (warn "load-pk-font: ~s: reread overwrites ~s" pkfile p))
+	     (let ((*%chars* (make-array 256)) *%font-dsize* *%resolution*)
                (pk:pktype pkfile)
-               (setf (gethash (truename pkfile) pkhash)
+               (setf (gethash (truename pkfile) *pkhash*)
                      (make-instance 'pkfile ; ugh! infer font name from file
                                     'font-name (pathname-name pkfile) ;XXX
                                     'font-size *%font-dsize*
                                     'resolution *%resolution*
                                     'chars *%chars*)))))))
-); end closure over pkhash 
 
 (defmethod pk-char-details ((pkfile pkfile) (car integer))
   ;; XXX return a list: specifically for destructuring
-  (check-type car (integer 0 256))
+  (check-type car (integer 0 255))
   (with-slots (x-off y-off width height raster rastersize rw)
       (aref (chars pkfile) car)
     (list x-off y-off width height raster rastersize rw)))
-

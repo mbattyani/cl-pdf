@@ -410,6 +410,10 @@
 		       :dict-values `(("/Type" . "/Annot")("/Subtype" . "/Text")
 				      ("/Rect" . ,rect)("/Contents" . ,text)))))
 
+(defmethod write-object ((obj null) &optional root-level)
+  (declare (ignorable root-level))
+  (write-string "null" *pdf-stream*))
+
 (defmethod write-object ((obj dictionary) &optional root-level)
   (declare (ignorable root-level))
   (write-string "<< " *pdf-stream*)
@@ -476,6 +480,13 @@
 (defmethod write-object ((obj function) &optional root-level)
   (declare (ignorable root-level))
   (write-object (funcall obj)))
+
+(defmethod write-object ((obj number) &optional root-level)
+  (declare (ignorable root-level))
+  (if (integerp obj)
+      (princ obj *pdf-stream*)
+      ;; rationals and such aren't allowed.
+      (format *pdf-stream* "~,3f" obj)))
 
 (defmethod write-object ((obj t) &optional root-level)
   (declare (ignorable root-level))

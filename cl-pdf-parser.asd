@@ -8,5 +8,6 @@
   :maintainer "Marc Battyani <marc.battyani@fractalconcept.com>"
   :description "PDF parser"
   :long-description "PDF parser"
-  :components ((:file "pdf-parser" :depends-on ()))
+  :components ((:file "pdf-parser" :depends-on ())
+               (:file "pdf-template" :depends-on ("pdf-parser")))
   :depends-on (:cl-pdf))

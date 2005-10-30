@@ -1,9 +1,11 @@
 
 I'd like to thank the following individuals for their contributions to cl-pdf:
 
+Aleksandar Bakic (Unicode, TrueType fonts)
+Tim Daly jr (PDF Templates)
 Alexey Dejneka (Parsing of the AFM files)
-Dmitri Ivanov (custom encodings, lots of improvements)
 Jörg Höhle (clisp zlib)
+Dmitri Ivanov (custom encodings, splitable tables, lots of improvements)
 Eric Marsden (meta-information (author, title, etc.))
 Eduardo Muñoz (geometrical functions (arc, circle, etc.))
 Alberto Riva (ACL zlib)

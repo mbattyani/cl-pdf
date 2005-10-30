@@ -1,4 +1,4 @@
-;;; cl-pdf copyright 2002-2003 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -21,39 +21,66 @@
 (defun set-gstate (&rest gstate)
   (format *page-stream* "~a gs~%" (name (apply #'add-gstate-to-page gstate))))
 
+(defun write-cid-string (string)
+  (write-char #\( *page-stream*)
+  (if (typep (font-metrics *font*) 'ttu-font-metrics)
+      (loop for c across string do
+	   (let* ((code (char-code c))
+		  (hi (ldb (byte 8 8) code))
+ 		  (lo (ldb (byte 8 0) code)))
+ 	     (write-char (code-char hi) *page-stream*)
+ 	     (write-char (code-char lo) *page-stream*)))
+      (princ string *page-stream*))
+  (write-string ") " *page-stream*))
+
+(defun write-cid-char (char)
+  (write-char #\( *page-stream*)
+  (if (typep (font-metrics *font*) 'ttu-font-metrics)
+      (let* ((code (char-code char))
+             (hi (ldb (byte 8 8) code))
+             (lo (ldb (byte 8 0) code)))
+        (write-char (code-char hi) *page-stream*)
+        (write-char (code-char lo) *page-stream*))
+      (write-char char *page-stream*))
+  (write-string ") " *page-stream*))
+
 (defmacro def-pdf-op (name (&rest args) format)
   (if args
     `(defun ,name ,args (format *page-stream* ,format ,@args))
     `(defun ,name () (write-line ,format *page-stream*))))
 
-(def-pdf-op move-text (dx dy) "~,3f ~,3f Td~%")
+(def-pdf-op move-text (dx dy) "~8f ~8f Td~%")
 
-(def-pdf-op draw-text (string) "(~a) Tj~%")
+(defun show-text (string) 
+  (write-cid-string string)
+  (write-line "Tj" *page-stream*))
 
-(def-pdf-op show-text (string) "(~a) Tj~%")
+(defun draw-text (string) (show-text string))
 
-(def-pdf-op show-text-on-next-line (string) "(~a) '~%")
+(defun show-text-on-next-line (string)
+  (write-cid-string string)
+  (write-line "'~%" *page-stream*))
 
 (def-pdf-op set-text-rendering-mode (mode) "~d Tr~%")
 
-(def-pdf-op set-char-spacing (space) "~,3f Tc~%")
+(def-pdf-op set-char-spacing (space) "~8f Tc~%")
 
-(def-pdf-op set-text-x-scale (scale) "~,3f Tz~%")
+(def-pdf-op set-text-x-scale (scale) "~8f Tz~%")
 
-(def-pdf-op set-text-leading (space) "~,3f TL~%")
+(def-pdf-op set-text-leading (space) "~8f TL~%")
 
-(def-pdf-op set-text-rise (rise) "~,3f Ts~%")
+(def-pdf-op set-text-rise (rise) "~8f Ts~%")
 
 (def-pdf-op move-to-next-line () " T*")
 
-(def-pdf-op set-text-matrix (a b c d e f) "~,3f ~,3f ~,3f ~,3f ~,3f ~,3f Tm~%")
+(def-pdf-op set-text-matrix (a b c d e f) "~10f ~10f ~10f ~10f ~10f ~10f Tm~%")
 
 (defun show-spaced-strings (strings)
   (write-string "[ " *page-stream*)
   (dolist (item strings)
     (if (numberp item)
        (format *page-stream* "~a " item)
-       (format *page-stream*"(~a) " item)))
+       (write-cid-string item)))
   (write-line "] TJ" *page-stream*))
 
 (defun show-char (char)
@@ -61,9 +88,10 @@
     (#\( (write-string "(\\() Tj " *page-stream*))
     (#\) (write-string "(\\)) Tj " *page-stream*))
     (#\\ (write-string "(\\\\) Tj " *page-stream*))
-    (t (format *page-stream* "(~c) Tj~%" char))))
+    (t (write-cid-char char) (write-line "Tj" *page-stream*))))
 
 ;;; graphic functions
+(defconstant +deg-to-rad+ #.(/ pi 180))
 
 (defmacro with-saved-state (&body body)
   `(unwind-protect
@@ -71,23 +99,31 @@
 	    ,@body)
     (write-line "Q" *page-stream*)))
 
-(def-pdf-op set-transform-matrix (a b c d e f) "~,3f ~,3f ~,3f ~,3f ~,3f ~,3f cm~%")
+(def-pdf-op set-transform-matrix (a b c d e f) "~8f ~8f ~8f ~8f ~8f ~8f cm~%")
 
-(def-pdf-op translate (dx dy) "1.0 0.0 0.0 1.0 ~,3f ~,3f cm~%")
+(def-pdf-op translate (dx dy) "1.0 0.0 0.0 1.0 ~8f ~8f cm~%")
 
 (defun rotate (deg)
-  (let* ((angle (/ (* pi deg) 180.0))
+  (let* ((angle (* +deg-to-rad+ deg))
 	 (s (sin angle))
 	 (c (cos angle)))
-    (format *page-stream* "~,3f ~,3f ~,3f ~,3f 0.0 0.0 cm~%" c s (- s) c)))
+    (format *page-stream* "~10f ~10f ~10f ~10f 0.0 0.0 cm~%" c s (- s) c)))
 
-(def-pdf-op scale (sx sy) " ~,3f 0.0 0.0 ~,3f 0.0 0.0 cm~%")
+(defun rotate* (radians)
+  (let* ((s (sin angle))
+	 (c (cos angle)))
+    (format *page-stream* "~10f ~10f ~10f ~10f 0.0 0.0 cm~%" c s (- s) c)))
+
+(def-pdf-op scale (sx sy) " ~8f 0.0 0.0 ~8f 0.0 0.0 cm~%")
 
 (defun skew (x-deg y-deg)
-  (format *page-stream* " 1.0 ~,3f ~,3f 1.0 0.0 0.0 cm~%"
-	  (tan (/ (* pi x-deg) 180.0))(tan (/ (* pi y-deg) 180.0))))
+  (format *page-stream* " 1.0 ~10f ~10f 1.0 0.0 0.0 cm~%"
+	  (tan (* +deg-to-rad+ x-deg))(tan (* +deg-to-rad+ y-deg))))
 
-(def-pdf-op set-line-width (width) "~,3f w~%")
+(defun skew* (x-radians y-radians)
+  (set-transform-matrix 1.0 (tan x-radians) (tan y-radians) 1.0 0.0 0.0))
+
+(def-pdf-op set-line-width (width) "~8f w~%")
 
 (def-pdf-op set-line-cap (mode) "~d J~%")
 
@@ -95,21 +131,21 @@
 
 (def-pdf-op set-dash-pattern (dash-array phase) "[~{~d~^ ~}] ~d d~%")
 
-(def-pdf-op set-mitter-limit (limit) "~,3f M~%")
+(def-pdf-op set-miter-limit (limit) "~8f M~%")
 
-(def-pdf-op move-to (x y) "~,3f ~,3f m~%")
+(def-pdf-op move-to (x y) "~8f ~8f m~%")
 
-(def-pdf-op line-to (x y) "~,3f ~,3f l~%")
+(def-pdf-op line-to (x y) "~8f ~8f l~%")
 
-(def-pdf-op bezier-to (x1 y1 x2 y2 x3 y3) "~,3f ~,3f ~,3f ~,3f ~,3f ~,3f c~%")
+(def-pdf-op bezier-to (x1 y1 x2 y2 x3 y3) "~8f ~8f ~8f ~8f ~8f ~8f c~%")
 
-(def-pdf-op bezier2-to (x2 y2 x3 y3) "~,3f ~,3f ~,3f ~,3f v~%")
+(def-pdf-op bezier2-to (x2 y2 x3 y3) "~8f ~8f ~8f ~8f v~%")
 
-(def-pdf-op bezier3-to (x1 y1 x3 y3) "~,3f ~,3f ~,3f ~,3f y~%")
+(def-pdf-op bezier3-to (x1 y1 x3 y3) "~8f ~8f ~8f ~8f y~%")
 
 (def-pdf-op close-path () " h")
 
-(def-pdf-op basic-rect (x y dx dy) "~,3f ~,3f ~,3f ~,3f re~%")
+(def-pdf-op basic-rect (x y dx dy) "~8f ~8f ~8f ~8f re~%")
 
 (defun paint-image (image)
   (format *page-stream* "~a Do~%" (name image)))
@@ -138,11 +174,11 @@
 
 (def-pdf-op even-odd-clip-path () " W*")
 
-(def-pdf-op set-gray-stroke (gray) "~,3f G~%")
+(def-pdf-op set-gray-stroke (gray) "~5f G~%")
 
-(def-pdf-op set-gray-fill (gray) "~,3f g~%")
+(def-pdf-op set-gray-fill (gray) "~5f g~%")
 
-(def-pdf-op set-rgb-stroke (r g b) "~,3f ~,3f ~,3f RG~%")
+(def-pdf-op set-rgb-stroke (r g b) "~5f ~5f ~5f RG~%")
 
 (defgeneric get-rgb (color)
  (:method ((color list))  
@@ -179,11 +215,11 @@
 (defun set-color-fill (color)
   (multiple-value-call #'set-rgb-fill (get-rgb color)))
 
-(def-pdf-op set-rgb-fill (r g b) "~,3f ~,3f ~,3f rg~%")
+(def-pdf-op set-rgb-fill (r g b) "~5f ~5f ~5f rg~%")
 
-(def-pdf-op set-cymk-stroke (c y m k) "~,3f ~,3f ~,3f ~,3f K~%")
+(def-pdf-op set-cymk-stroke (c y m k) "~5f ~5f ~5f ~5f K~%")
 
-(def-pdf-op set-cymk-fill (c y m k) "~,3f ~,3f ~,3f ~,3f k~%")
+(def-pdf-op set-cymk-fill (c y m k) "~5f ~5f ~5f ~5f k~%")
 
 (defun draw-image (image x y dx dy rotation &optional keep-aspect-ratio)
   (when keep-aspect-ratio

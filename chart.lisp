@@ -411,13 +411,13 @@
 			(reduce #'min
 				(mapcar #'(lambda (values)
 					    (reduce #'min
-						    (mapcar #'second values)))
+						    (remove nil (mapcar #'second values))))
 					(series plot)))
 			:max-value
 			(reduce #'max
 				(mapcar #'(lambda (values)
 					    (reduce #'max
-						    (mapcar #'second values)))
+						    (remove nil (mapcar #'second values))))
 					(series plot)))))))
   (setf (x-axis plot)
 	(apply #'make-instance 'horizontal-value-axis
@@ -428,13 +428,13 @@
 			(reduce #'min
 				(mapcar #'(lambda (values)
 					    (reduce #'min
-						    (mapcar #'first values)))
+						    (remove nil (mapcar #'first values))))
 					(series plot)))
 			:max-value
 			(reduce #'max
 				(mapcar #'(lambda (values)
 					    (reduce #'max
-						    (mapcar #'first values)))
+						    (remove nil (mapcar #'first values))))
 					(series plot)))))))
   (when (labels&colors plot)
     (setf (legend plot)
@@ -476,16 +476,23 @@
 	    for (name color) in (labels&colors obj) do
 	   (apply #'set-rgb-stroke color)
 	   (apply #'set-rgb-fill color)
-	   (let ((points '()))
-	     (loop for value in serie
-		for x = (* (- (first value) min-value-x) scale-x)
-		    for y = (* (- (second value) min-value-y) scale-y)
+	   (let ((points '())
+		 (all-points '()))
+	     (loop for (xx yy) in serie
+		for x = (when xx (* (- xx min-value-x) scale-x))
+		for y = (when yy (* (- yy min-value-y) scale-y))
 		do
-		  (push (list x y) points)
-		  (unless (zerop (point-radius obj))
-		    (circle x y (point-radius obj)))
-		  (fill-and-stroke))
-	     (polyline points)
+		  (if (and x y)
+		      (progn
+			(push (list x y) points)
+			(unless (zerop (point-radius obj))
+			  (circle x y (point-radius obj)))
+			(fill-and-stroke))
+		      (when points
+			(push points all-points)
+			(setf points '()))))
+	     (when points (push points all-points))
+	     (map nil 'polyline all-points)
 	     (stroke)))
       (when (post-draw-chart-fn obj)
 	(funcall (post-draw-chart-fn obj) obj width height scale-x scale-y 

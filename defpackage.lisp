@@ -1,6 +1,6 @@
 (in-package cl-user)
 
-;;; cl-pdf copyright 2002-2003 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -22,9 +22,9 @@
    #:show-text-on-next-line #:show-spaced-strings
    #:set-text-rendering-mode #:set-char-spacing #:set-text-x-scale #:set-text-leading
    #:set-text-rise #:move-to-next-line #:set-text-matrix #:draw-and-adjust-string
-   #:with-saved-state #:set-transform-matrix #:translate #:rotate #:scale #:skew
+   #:with-saved-state #:set-transform-matrix #:translate #:rotate #:scale #:skew #:rotate* #:skew*
    #:set-line-width #:set-line-cap #:set-line-join #:set-dash-pattern
-   #:set-mitter-limit #:move-to #:line-to #:bezier-to #:bezier2-to #:bezier3-to
+   #:set-miter-limit #:move-to #:line-to #:bezier-to #:bezier2-to #:bezier3-to
    #:arc #:pie #:circle #:ellipse #:rectangle #:polyline #:regular-polygon #:star
    #:close-sub-path #:basic-rect #:stroke #:close-and-stroke #:fill-path #:close-and-fill #:even-odd-fill
    #:fill-and-stroke #:even-odd-fill-and-stroke #:close-fill-and-stroke
@@ -37,6 +37,7 @@
    #:draw-centered-text #:draw-left-text #:draw-right-text
    #:vertical-value-axis #:horizontal-histo-axis #:legend #:histogram #:draw-object
    #:pie-chart #:plot-xy
-   #:load-t1-font #:encoding #:get-encoding
+   #:load-t1-font #:load-ttu-font #:encoding #:get-encoding
    #:draw-bar-code128 #:*page-number*
+   #:test-template #:make-template-from-page #:add-templates-to-page #:draw-template
 ))

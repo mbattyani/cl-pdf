@@ -53,17 +53,17 @@
   ((stream :initarg :stream :reader pdf-parse-error-stream)
    (message :initarg :message :reader pdf-parse-error-message))
   (:report (lambda (condition stream)
-             (format stream "~&Error while reading PDF document.~%~A~%~A~%"
-                     (pdf-parse-error-message condition)
+             (format stream "~&Error at position ~D while reading PDF document.~%~A~%~A~%"                     (file-position (pdf-parse-error-stream condition))                     (pdf-parse-error-message condition)
                      (pdf-parse-error-stream condition)))))
 
 (defun unexpected-character-error (char)
   (cerror "Ignore the character and continue."
           'pdf-parse-error
           :stream *pdf-input-stream*
-          :message (format nil "Unexpected character ~S." char)))
+          :message (format nil "Unexpected character ~S at ~A." char
+                           (file-position *pdf-input-stream*))))
 
-(defconstant +white-char+ (coerce '(#\Space #\Newline #\Return #\Tab #\Null #\Page) 'string))
+(defvar +white-char+ (coerce '(#\Space #\Newline #\Return #\Tab #\Null #\Page) 'string))
 
 (defun white-char-p (c)
   (find c +white-char+))
@@ -89,8 +89,8 @@
       (cerror "Ignore the character and continue."
               'pdf-parse-error
               :stream *pdf-input-stream*
-              :message (format nil "Unexpected character ~S (expected ~S)."
-                               char expected-char)))))
+              :message (format nil "Unexpected character ~S (expected ~S) at ~A."
+                               char expected-char (file-position *pdf-input-stream*))))))
 
 (defun eat-chars (chars)
   (loop for char across chars
@@ -116,7 +116,6 @@
 ;;; PDF Basic objects (see Chapter 4)
 
 (defun read-object (&optional (eof-error-p t))
-
   "Returns one of the following PDF objects: boolean (:true or :false),
 number (Lisp number), string (Lisp string), name (Lisp symbol in the PDF
 package), array (Lisp vector), dictionary (Lisp property list), stream
@@ -150,6 +149,10 @@ package), array (Lisp vector), dictionary (Lisp property list), stream
            "false")
           ((eql char #\n)
            (eat-chars "null")
+           nil)
+          ((eql char #\e)
+           ;; this is probably an empty indirect object.  WRITE-OBJECT
+           ;; can write them, so we should be able to read them too.
            nil)
           (t (unexpected-character-error char)))))
 
@@ -185,7 +188,7 @@ package), array (Lisp vector), dictionary (Lisp property list), stream
 (defun parse-hex (digit-1 digit-2)
   (flet ((parse-digit (digit)
            (- (char-code digit)
-              (char-code (if (char<= #\0 digit #\9) #\0 #\A)))))
+              (if (char<= #\0 digit #\9) #.(char-code #\0) #.(- (char-code #\A) 10)))))
     (+ (* 16 (parse-digit (char-upcase digit-1)))
        (parse-digit (char-upcase digit-2)))))
 
@@ -337,6 +340,9 @@ package), array (Lisp vector), dictionary (Lisp property list), stream
   (file-position *pdf-input-stream* position)
   (eat-keyword "xref")
   (loop
+   ;; the eat-keyword skips whitespace the first time, but there can
+   ;; be more whitespace the second time around.
+     (skip-whitespace t)
      (let ((char (peek-char nil *pdf-input-stream*)))
        (cond ((char= char #\t) (return))
              (t (read-cross-reference-subsection))))))
@@ -364,10 +370,13 @@ package), array (Lisp vector), dictionary (Lisp property list), stream
   (eat-chars "<<")
   (read-dictionary))
 
+(defconstant +xref-search-size+ 1024
+  "Read this many bytes at end of file to look for 'startxref'")
+
 (defun find-cross-reference-start ()
   (let ((file-length (file-length *pdf-input-stream*))
-        (buffer (make-string 100)))
-    (file-position *pdf-input-stream* (- file-length 100))
+        (buffer (make-string +xref-search-size+)))
+    (file-position *pdf-input-stream* (- file-length +xref-search-size+))
     (read-sequence buffer *pdf-input-stream*)
     (let ((position (search "startxref" buffer)))
       (unless position
@@ -433,6 +442,7 @@ Returns the first unused object-number."
 (defvar *current-content* nil)
 
 (defun insert-original-page-content ()
+  ;; save graphics state
   (write-line " q" *page-stream*)
   (vector-push-extend (make-instance 'indirect-object :content 
 				     (make-instance 'pdf-stream :content 
@@ -443,6 +453,7 @@ Returns the first unused object-number."
 	   (vector-push-extend content *current-content*))
       (vector-push-extend *original-content* *current-content*))
   (setf *page-stream* (make-string-output-stream))
+  ;; restore graphics state
   (write-line " Q" *page-stream*))
 
 (export 'insert-original-page-content)

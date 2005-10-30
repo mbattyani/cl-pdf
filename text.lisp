@@ -7,6 +7,11 @@
 ;;; Basic (and crude) text layout functions
 ;;; use cl-typesetting for nice text layout functions
 
+(defconstant +section-char+ (code-char 167)
+  "This character is not entered literally to avoid causing problems
+with Lisps that read source files in UTF-8 encoding.")
+(defvar *delimiter-chars* (list #\Space #\Tab #\Newline +section-char+))
+
 (defun text-width (string font font-size)
   (loop for c across string
 	summing (get-char-width c font font-size)))
@@ -21,12 +26,14 @@
 	(loop for i from 0
 	      for c across string
 	      for d = (get-char-width c font font-size) do
-	      (if (or (char= c #\Newline)(char= c #\§)(> (+ width d) max-width))
+	      (if (or (char= c #\Newline)
+                      (char= c +section-char+)
+                      (> (+ width d) max-width))
 		  (progn 
-		    (push (string-trim '(#\Space #\Tab #\Newline #\§) (subseq string start i)) result)
+		    (push (string-trim *delimiter-chars* (subseq string start i)) result)
 		    (setf start i width 0))
 		  (incf width d))
-	      finally (push (string-trim '(#\Space #\Tab #\Newline #\§) (subseq string start)) result))
+	      finally (push (string-trim *delimiter-chars* (subseq string start)) result))
 	(nreverse result))))
 
 (defun draw-centered-text (x y string font font-size &optional max-width)
