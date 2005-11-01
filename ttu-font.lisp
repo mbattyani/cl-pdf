@@ -10,96 +10,67 @@
 
 (in-package pdf)
 
-
 (defclass ttu-font-metrics (font-metrics)
   ((c2g :accessor c2g
-	:initform
-	(make-array 131072 :element-type 'character :initial-element #\Nul))
-   (pdf-widths :accessor pdf-widths
-	       :initform (make-array 0 :adjustable t :fill-pointer 0))
+	:initform (make-array 131072 :element-type 'character :initial-element #\Nul))
+   (cid-widths :accessor cid-widths :initform (make-array 0 :adjustable t :fill-pointer 0))
+   (pdf-widths :accessor pdf-widths :initform nil)
    (binary-data :accessor binary-data :initform nil)
+   (min-code :accessor min-code :initform 0)
+   (max-code :accessor max-code :initform 0)
    (length1 :accessor length1)))
 
 (define-afm-section
-    (ufm-font-metrics "FontMetrics") (stream font-metrics-class)
-  (let ((font-metrics (make-instance font-metrics-class)))
-    (macrolet ((named-parameter (key type param)
-                 `(key ,key ((,param ,type))
-		       (setf (,param font-metrics) ,param)))
-	       (scaled-parameter (key type param)
-                 `(key ,key ((,param ,type))
-		       (setf (,param font-metrics) (* 0.001 ,param)))))
+    (ufm-font-metrics "FontMetrics") (stream font-metrics)
+  (let ((ucode-to-char (make-hash-table :test #'equal)))
       (process-keywords
        (key "EndFontMetrics" ()
-	    (setf (gethash
-		   (string-downcase (font-name font-metrics))
-		   *font-metrics*)
-		  font-metrics
-		  (leading font-metrics)
-		  (- 1 (descender font-metrics))
-		  (italic-sin font-metrics)
-		  (sin (/ (* pi (italic-angle font-metrics)) -180)))
-	    (return-from ufm-font-metrics font-metrics))
-       (named-parameter "FontName" string font-name)
-       (named-parameter "FullName" string full-name)
-       (named-parameter "FamilyName" string family-name)
-       (named-parameter "Weight" string weight)
-       (key "FontBBox" ((llx number) (lly number) (urx number) (ury number))
-            (setf (font-bbox font-metrics)
-		  (vector
-		   (* 0.001 llx) (* 0.001 lly) (* 0.001 urx) (* 0.001 ury))))
-       (named-parameter "Version" string version)
-       (named-parameter "Notice" string notice)
-       (named-parameter "EncodingScheme" string encoding-scheme)
-       (named-parameter "MappingScheme" integer mapping-scheme)
-       (named-parameter "EscChar" integer esc-char)
-       (named-parameter "CharacterSet" string character-set)
-       (named-parameter "Characters" integer characters)
-       (named-parameter "IsBaseFont" boolean base-font-p)
-       ;; vvector
-       (named-parameter "IsFixedV" boolean fixed-v-p)
-       (scaled-parameter "CapHeight" number cap-height)
-       (scaled-parameter "XHeight" number x-height)
-       (scaled-parameter "Ascender" number ascender)
-       (scaled-parameter "Descender" number descender)
-       (named-parameter "IsFixedPitch" boolean fixed-pitch-p)
-       (key "CharWidth" ((x number) (y number))
-            (setf (char-width font-metrics) (list (* 0.001 x) (* 0.001 y))
-		  (fixed-pitch-p font-metrics) t))
-       (named-parameter "ItalicAngle" number italic-angle)
-       (scaled-parameter "UnderlinePosition" number underline-position)
-       (scaled-parameter "UnderlineThickness" number underline-thickness)
+            (let ((min-code #xfffe)
+                  (max-code 0)
+                  (void-char (gethash "VoidCharacter" (characters font-metrics)))
+                  encoding-vector pdf-widths)
+              (iter (for (code char-metrics) in-hashtable ucode-to-char)
+                    (when (> code max-code) (setf max-code code))
+                    (when (< -1 code min-code) (setf min-code code)))
+              (setf encoding-vector (make-array (1+ max-code) :initial-element void-char)
+                    pdf-widths (make-array (1+ max-code) :initial-element 0))
+              (iter (for (code char-metrics) in-hashtable ucode-to-char)
+                    (when (<= min-code code max-code)
+                      (setf (aref encoding-vector code) char-metrics
+                            (aref pdf-widths code) (round (* 1000 (width char-metrics))))))
+              (setf (min-code font-metrics) min-code
+                    (max-code font-metrics) max-code
+                    (encoding-vector font-metrics) encoding-vector
+                    (pdf-widths font-metrics) pdf-widths
+                    (encoding-scheme font-metrics) :unicode-encoding
+                    (gethash (string-downcase (font-name font-metrics)) *font-metrics*) font-metrics
+                    (leading font-metrics) (- 1 (descender font-metrics))
+                    (italic-sin font-metrics) (sin (/ (* pi (italic-angle font-metrics)) -180))))
+            (return-from ufm-font-metrics font-metrics))
        (key "StartCharMetrics" ()
             (setf (characters font-metrics)
                   (ufm-char-metrics
 		   stream (char-width font-metrics)
-		   (italic-sin font-metrics) font-metrics)))
-       (key "StartKernPairs" ()
-	    (afm-char-kernings
-	     stream (characters font-metrics) (kernings font-metrics)))))))
+		   (italic-sin font-metrics) font-metrics ucode-to-char))))))
 
 (define-afm-section
     (ufm-char-metrics "CharMetrics")
-    (stream default-width italic-sin font-metrics)
-  (let ((metrics (make-hash-table :test #'equal))
+    (stream default-width italic-sin font-metrics ucode-to-char)
+  (let ((metrics (characters font-metrics))
 	(encoding (encoding-vector font-metrics))
 	char-metrics)
-    (setf (gethash "VoidCharacter" metrics)
-	  (make-instance
-	   'char-metrics :code -1 :name "VoidChar" :width 0 :bbox #(0 0 0 0)
-	   :spacing 0))
     (process-keywords
      (key "EndCharMetrics" () (return-from ufm-char-metrics metrics))
      (t (let ((width default-width)
 	      (stroke-width 0)
+	      (cid-width 0)
               (code -1)
-	      (bbox (font-bbox font-metrics))
 	      (name nil)
 	      (gid nil))
           (process-keywords-in-line
            (key "U" ((p-code integer)) (setq code p-code))
            (key "CH" ((p-code hex)) (setq code p-code))
-           (key "WX" ((p-width number)) (setq width p-width))
+           (key "WX" ((p-width number)) (setq cid-width p-width))
            (key "N" ((p-name name)) (setq name p-name))
 	   (key "G" ((p-gid integer)) (setq gid p-gid)))
 	  (when (and (<= 0 code #xfffe) gid)
@@ -107,26 +78,22 @@
 		  (code-char (ldb (byte 8 8) gid))
 		  (aref (c2g font-metrics) (+ (* 2 code) 1))
 		  (code-char (ldb (byte 8 0) gid)))
-	    (vector-push-extend code (pdf-widths font-metrics))
-	    (vector-push-extend (vector width) (pdf-widths font-metrics)))
-          (unless width
+	    (vector-push-extend code (cid-widths font-metrics))
+	    (vector-push-extend (vector cid-width) (cid-widths font-metrics)))
+          (unless cid-width
             (error "Width is not given for a character C ~D." code))
-	  (setf char-metrics
-		(make-instance
-		 'char-metrics :code code :name name :width width :bbox bbox
-		 :spacing (- width stroke-width)
-		 :left-italic-correction
-		 (if bbox (* italic-sin (aref bbox 3)) 0)
-		 :right-italic-correction
-		 (if bbox (* italic-sin (aref bbox 1)) 0)))
-	  (when name
-	    (setf (gethash name metrics) char-metrics)))))))
+	  (setf char-metrics (gethash name metrics))
+          (setf (code char-metrics) code)
+	  (when code
+	    (setf (gethash code ucode-to-char) char-metrics)))))))
 
-(defun read-ufm-file (filename
-		      &optional (font-metrics-class 'ttu-font-metrics))
-  (with-open-file (s filename
-		   :direction :input :external-format +external-format+)
-    (ufm-font-metrics s font-metrics-class)))
+(defun read-ufm-file (filename &optional (font-metrics-class 'ttu-font-metrics))
+  (let ((afm-filemane (merge-pathnames (make-pathname :type "afm") filename))
+        ufm)
+    (with-open-file (s afm-filemane :direction :input :external-format +external-format+)
+      (setf ufm (afm-font-metrics s font-metrics-class)))
+    (with-open-file (s filename :direction :input :external-format +external-format+)
+      (ufm-font-metrics s ufm))))
 
 (defmethod font-type ((fm ttu-font-metrics))
   (declare (ignore fm))
@@ -219,7 +186,7 @@
 		    'cid-font
 		    :base-font (font-name fm)
 		    :descriptor font-descriptor
-		    :widths (pdf-widths fm)
+		    :widths (cid-widths fm)
 		    :c2g (c2g fm))))
     (make-instance
      'dictionary

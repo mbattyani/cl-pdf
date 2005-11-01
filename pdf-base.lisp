@@ -23,7 +23,7 @@
 
 (defun write-cid-string (string)
   (write-char #\( *page-stream*)
-  (if (typep (font-metrics *font*) 'ttu-font-metrics)
+  (if (and *font* (typep (font-metrics *font*) 'ttu-font-metrics))
       (loop for c across string do
 	   (let* ((code (char-code c))
 		  (hi (ldb (byte 8 8) code))
@@ -35,7 +35,7 @@
 
 (defun write-cid-char (char)
   (write-char #\( *page-stream*)
-  (if (typep (font-metrics *font*) 'ttu-font-metrics)
+  (if (and *font* (typep (font-metrics *font*) 'ttu-font-metrics))
       (let* ((code (char-code char))
              (hi (ldb (byte 8 8) code))
              (lo (ldb (byte 8 0) code)))

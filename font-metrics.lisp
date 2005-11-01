@@ -1,4 +1,4 @@
-;;; cl-pdf copyright 2002-2003 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 

@@ -76,6 +76,26 @@
 		 (vector-push-extend "/.notdef" differences)))
     differences))
 
+(defclass unicode-encoding ()
+  ())
+
+(defmethod name ((encoding unicode-encoding))
+  "UnicodeEncoding")
+
+(defmethod keyword-name ((encoding unicode-encoding))
+  :unicode-encoding)
+
+(defmethod standard-encoding ((encoding unicode-encoding))
+  t)
+
+(defmethod initialize-instance :after ((encoding unicode-encoding) &rest init-options &key &allow-other-keys)
+  (setf (gethash encoding *encodings*) encoding
+	(gethash (name encoding) *encodings*) encoding
+	(gethash (keyword-name encoding) *encodings*) encoding))
+
+(defvar *unicode-encoding*
+  (make-instance 'unicode-encoding))
+
 (defvar *standard-encoding*
   (make-instance 'encoding :name "StandardEncoding" :keyword-name :standard-encoding
 		 :standard-encoding t :char-names #(

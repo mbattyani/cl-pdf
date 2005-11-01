@@ -1,4 +1,4 @@
-;;; cl-pdf copyright 2002-2003 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -37,29 +37,34 @@
   (let ((font-metrics (gethash (name font) *font-metrics*)))
     (unless font-metrics (error "Font ~s not found" (name font)))
     (setf (font-metrics font) font-metrics)
-    (unless encoding 
+    (unless encoding
       (setf (gethash (list (name font) nil) *font-cache*) font))
     (setf (encoding font)
 	  (if encoding
 	      (get-encoding encoding)
 	      (extract-font-metrics-encoding font-metrics)))
     (setf (gethash (list (name font) (encoding font)) *font-cache*) font)
-    (loop with font-characters = (characters font-metrics)
-	  with pdf-widths = (pdf-widths font)
-	  with void-char = (gethash "VoidCharacter" font-characters)
-	  and characters = (characters font)
-	  and hyphen-code = nil
-	  for i from 0 to 255
-	  for char-name across (char-names (encoding font))
-	  for char = (or (gethash char-name font-characters)
-                         (aref (encoding-vector font-metrics) i)
-                         void-char)
-	  do (setf (aref characters i) char
-		   (aref pdf-widths i) (round (* 1000 (width char))))
-	  (when (and (not hyphen-code) (string= char-name "hyphen"))
-	    (setf hyphen-code i
-		  (hyphen-code font) i
-		  (hyphen-char font) (code-char i))))
+    (if (eql (keyword-name (encoding font)) :unicode-encoding)
+        (setf (pdf-widths font) (pdf-widths font-metrics)
+              (characters font) (encoding-vector font-metrics)
+              (hyphen-char font) (gethash "hyphen" (characters font-metrics))
+              (hyphen-code font) (if (hyphen-char font) (code (hyphen-char font)) 0))
+        (loop with font-characters = (characters font-metrics)
+           with pdf-widths = (pdf-widths font)
+           with void-char = (gethash "VoidCharacter" font-characters)
+           and characters = (characters font)
+           and hyphen-code = nil
+           for i from 0 to 255
+           for char-name across (char-names (encoding font))
+           for char = (or (gethash char-name font-characters)
+                          (aref (encoding-vector font-metrics) i)
+                          void-char)
+           do (setf (aref characters i) char
+                    (aref pdf-widths i) (round (* 1000 (width char))))
+             (when (and (not hyphen-code) (string= char-name "hyphen"))
+               (setf hyphen-code i
+                     (hyphen-code font) i
+                     (hyphen-char font) (code-char i)))))
     (compute-kern-pairs font)))
 
 (defun compute-kern-pairs (font)
@@ -73,7 +78,7 @@
 		 (let ((code1 (gethash (car k) char-to-code))
 		       (code2 (gethash (cdr k) char-to-code)))
 		   (when (and code1 code2)
-		     (setf (gethash (+ (* code1 256) code2) kernings) (car v)))))
+		     (setf (gethash (+ (* code1 65536) code2) kernings) (car v)))))
 	     (kernings (font-metrics font)))))
 
 (defun get-char (code font)
@@ -115,12 +120,15 @@
 	(values left right))))
 
 (defun get-kerning (char1 char2 font &optional font-size)
-  (let ((kerning (gethash (+ (* (force-char-code char1) 256)
+  (let ((kerning (gethash (+ (* (force-char-code char1) 65536)
 			     (force-char-code char2))(kernings font) 0)))
     (if font-size (* font-size kerning) kerning)))
 
 (defun get-font (&optional (name "helvetica") (encoding *default-encoding*))
   (setf name (string-downcase name))
+  (let ((font-metrics (gethash name *font-metrics*)))
+    (when (typep font-metrics 'ttu-font-metrics)
+      (setf encoding *unicode-encoding*)))
   (let ((font (gethash (list name (get-encoding encoding)) *font-cache*)))
     (if font
 	font
