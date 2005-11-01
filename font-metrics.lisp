@@ -11,6 +11,7 @@
 (defclass char-metrics ()
   ((code  :accessor code  :initarg :code)
    (name  :accessor name  :initarg :name)
+   (index :accessor index  :initarg :index)
    (width :accessor width :initarg :width)
    (spacing :accessor spacing :initarg :spacing)
    (right-italic-correction :accessor right-italic-correction :initarg :right-italic-correction)
@@ -236,11 +237,13 @@
 	(encoding (encoding-vector font-metrics))
 	char-metrics)
     (setf (gethash "VoidCharacter" metrics)
-	  (make-instance 'char-metrics :code -1 :name "VoidChar" :width 0 :bbox #(0 0 0 0) :spacing 0))
+	  (make-instance 'char-metrics :code -1 :name "VoidChar" :index 0 
+                         :width 0 :bbox #(0 0 0 0) :spacing 0))
     (process-keywords
      (key "EndCharMetrics" () (return-from afm-char-metrics metrics))
      (t (let ((width default-width)
 	      (stroke-width 0)
+              (index 0)
               (code -1)
 	      (name nil)
 	      (bbox (font-bbox font-metrics)))
@@ -249,17 +252,18 @@
            (key "CH" ((p-code hex)) (setq code p-code))
            (key "WX" ((p-width number)) (setq width (* 0.001 p-width)))
            (key "N" ((p-name name)) (setq name p-name))
+           (key "I" ((p-index number)) (setq index p-index))
 	   (key "B" ((llx number) (lly number) (urx number) (ury number))
 		(setf bbox (vector (* 0.001 llx) (* 0.001 lly) (* 0.001 urx) (* 0.001 ury)))
 		(setf stroke-width (if (zerop urx) width (* 0.001 urx)))))
           (unless width
             (error "Width is not given for a character C ~D." code))
 	  (setf char-metrics
-		(make-instance 'char-metrics :code code :name name :width width :bbox bbox
+		(make-instance 'char-metrics :code code :name name :index index :width width :bbox bbox
 			       :spacing (- width stroke-width)
 			       :left-italic-correction (if bbox (* italic-sin (aref bbox 3)) 0)
 			       :right-italic-correction (if bbox (* italic-sin (aref bbox 1)) 0)))
-	  (when (plusp code)
+	  (when (<= 0 code 255)
 	    (setf (aref encoding code) char-metrics))
 	  (when name
 	    (setf (gethash name metrics) char-metrics)))))))
@@ -281,6 +285,42 @@
 (defun read-afm-file (filename &optional (font-metrics-class 'font-metrics))
   (with-open-file (s filename :direction :input :external-format +external-format+)
     (afm-font-metrics s font-metrics-class)))
+
+(defun read-ufm-file (filename &optional (font-metrics-class 'ttu-font-metrics))
+  (let ((min-code #xfffe)
+        (max-code 0)
+        void-char encoding-vector pdf-widths font-metrics)
+    (with-open-file (s filename :direction :input :external-format +external-format+)
+      (setf font-metrics (afm-font-metrics s font-metrics-class)))
+    (setf void-char (gethash "VoidCharacter" (characters font-metrics)))
+    (iter (for (name char-metrics) in-hashtable (characters font-metrics))
+          (for gid = (index char-metrics))
+          (for code = (code char-metrics))
+          (when (and (<= 0 code #xfffe))
+            (when (> code max-code) (setf max-code code))
+            (when (< code min-code) (setf min-code code))
+            (setf (aref (c2g font-metrics) (* 2 code))
+		  (code-char (ldb (byte 8 8) gid))
+		  (aref (c2g font-metrics) (+ (* 2 code) 1))
+		  (code-char (ldb (byte 8 0) gid)))
+	    (vector-push-extend code (cid-widths font-metrics))
+	    (vector-push-extend (vector (round (* 1000 (width char-metrics)))) (cid-widths font-metrics))))
+    (setf encoding-vector (make-array (1+ max-code) :initial-element void-char)
+          pdf-widths (make-array (1+ max-code) :initial-element 0))
+    (iter (for (name char-metrics) in-hashtable (characters font-metrics))
+          (for code = (code char-metrics))
+          (when (<= min-code code max-code)
+            (setf (aref encoding-vector code) char-metrics
+                  (aref pdf-widths code) (round (* 1000 (width char-metrics))))))
+    (setf (min-code font-metrics) min-code
+          (max-code font-metrics) max-code
+          (encoding-vector font-metrics) encoding-vector
+          (pdf-widths font-metrics) pdf-widths
+          (encoding-scheme font-metrics) :unicode-encoding
+          (gethash (string-downcase (font-name font-metrics)) *font-metrics*) font-metrics
+          (leading font-metrics) (- 1 (descender font-metrics))
+          (italic-sin font-metrics) (sin (/ (* pi (italic-angle font-metrics)) -180)))
+    font-metrics))
 
 (defmethod font-type (font-metrics)
   (declare (ignore font-metrics))
