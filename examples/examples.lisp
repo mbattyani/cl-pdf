@@ -23,6 +23,7 @@
     (pdf:write-document file)))
 
 ;; for the TrueType Example, you need to load the font first:
+;; (read the unicode-readme for more info)
 #+nil
 (pdf:load-ttu-font #P"/tmp/times.ufm" #P"/tmp/times.ttf")
 
