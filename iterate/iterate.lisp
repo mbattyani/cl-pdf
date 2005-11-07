@@ -1346,13 +1346,13 @@
 		       (when (equal all-keywords 
 				    (clause-info-keywords (cdr entry)))
 			 ;; else warn that an &optional part is missing??
-			 (delete entry index) t))
+			 (setf index (delete entry index)) t))
 		      (t ;; an index
 		       (prog1
 			   (remove-clause-internal (cdr keywords) (cdr entry))
 			 ;; if the index is empty, delete it too
 			 (if (null (cddr entry))
-			     (delete entry index))))))))
+			     (setf index (delete entry index)))))))))
      (remove-clause-internal req-keywords *clause-info-index*))))
 
 
@@ -1986,7 +1986,7 @@
     (setq vars (nreverse vars))
     (setq tplates (nreverse tplates))
     (let ((mv-setq `(multiple-value-setq ,vars ,value))
-	  (temp-vars (delete nil temps)))
+	  (temp-vars (remove nil temps)))
       (if (null temp-vars)
 	  mv-setq
 	  `(let ,temp-vars

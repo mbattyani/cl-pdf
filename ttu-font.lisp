@@ -27,7 +27,7 @@
 (defun load-ttu-font (ufm-file &optional ttf-file)
   (let ((ttufm (read-ufm-file ufm-file 'ttu-font-metrics)))
     (when ttf-file
-      (with-open-file (in ttf-file :direction :input :element-type :default)
+      (with-open-file (in ttf-file :direction :input :element-type '(unsigned-byte 8))
 	(setf (length1 ttufm)
 	      (file-length in)
 	      (binary-data ttufm)

@@ -59,7 +59,7 @@
 
 (defun show-text-on-next-line (string)
   (write-cid-string string)
-  (write-line "'~%" *page-stream*))
+  (write-line "'" *page-stream*))
 
 (def-pdf-op set-text-rendering-mode (mode) "~d Tr~%")
 
@@ -110,8 +110,8 @@
     (format *page-stream* "~10f ~10f ~10f ~10f 0.0 0.0 cm~%" c s (- s) c)))
 
 (defun rotate* (radians)
-  (let* ((s (sin angle))
-	 (c (cos angle)))
+  (let* ((s (sin radians))
+	 (c (cos radians)))
     (format *page-stream* "~10f ~10f ~10f ~10f 0.0 0.0 cm~%" c s (- s) c)))
 
 (def-pdf-op scale (sx sy) " ~8f 0.0 0.0 ~8f 0.0 0.0 cm~%")
