@@ -140,7 +140,7 @@
 				      ("/Kids" . ,(pages obj))))))
 
 (defclass page (indirect-object)
-  ((bounds :accessor bounds :initform #(0 0 595 841) :initarg :bounds)
+  ((bounds :accessor bounds :initform *default-page-bounds* :initarg :bounds)
    (resources :accessor resources :initform (make-instance 'dictionary))
    (fonts :accessor fonts :initform '())
    (font-objects :accessor font-objects :initform (make-instance 'dictionary))

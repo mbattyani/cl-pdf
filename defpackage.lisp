@@ -10,6 +10,9 @@
    #:*compress-streams* #:*zlib-search-paths* #:*zlib-loaded* #:load-zlib
    #:*max-number-of-pages* #:max-number-of-pages-reached
    #:*afm-files-directories* #:*default-encoding*
+   #:*letter-portrait-page-bounds* #:*letter-landscape-page-bounds*
+   #:*a4-portrait-page-bounds* #:*a4-landscape-page-bounds*
+   #:*default-page-bounds*
    #:load-fonts #:get-font #:font #:clear-font-cache #:name #:encoding #:font-metrics #:add-font-to-page
    #:font-name #:full-name #:family-name #:weight #:font-bbox #:*version* #:notice #:encoding-scheme
    #:characters #:code #:width #:bbox #:kernings #:get-char #:get-char-width #:get-char-size

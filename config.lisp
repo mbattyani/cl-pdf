@@ -57,3 +57,8 @@
 (defvar *max-number-of-pages* 1000
   "The maximum number of pages for a document")
 
+(defvar *a4-portrait-page-bounds* #(0 0 595 841))
+(defvar *letter-portrait-page-bounds* #(0 0 612 792))
+(defvar *a4-landscape-page-bounds* #(0 0 841 595))
+(defvar *letter-landscape-page-bounds* #(0 0 792 612))
+(defvar *default-page-bounds* *a4-portrait-page-bounds*)
