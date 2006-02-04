@@ -3,4 +3,6 @@ To avoid potential problems with different versions of ITERATE, I've included
 it in the same repository than cl-pdf and cl-typesetting. 
 This version is known to work well with cl-pdf and cl-typesetting.
 
+Anyway, you should use the latest official Iterate version and revert to this one only in case of problems. 
+
 Marc
