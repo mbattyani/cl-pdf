@@ -471,7 +471,12 @@
 	   (move-to 0 tick-y)
 	   (line-to width tick-y)
 	   (stroke))
+      (loop for tick-x across (ticks-positions (x-axis obj)) do
+	   (move-to tick-x 0)
+	   (line-to tick-x height)
+	   (stroke))
       (set-line-width (line-width obj))
+      (set-line-join 2)
       (loop for serie in (series obj)
 	    for (name color) in (labels&colors obj) do
 	   (apply #'set-rgb-stroke color)
@@ -486,8 +491,8 @@
 		      (progn
 			(push (list x y) points)
 			(unless (zerop (point-radius obj))
-			  (circle x y (point-radius obj)))
-			(fill-and-stroke))
+			  (circle x y (point-radius obj))
+                          (fill-and-stroke)))
 		      (when points
 			(push points all-points)
 			(setf points '()))))
