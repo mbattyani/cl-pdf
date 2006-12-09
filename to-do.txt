@@ -11,3 +11,5 @@ Higher level graphical functions.
 
 Syntax converters (SVG, VML, ?)
 
+Make compression work with ACL Windows (currently I can't get the
+  character-encoding to be compatible for that platform combo).
