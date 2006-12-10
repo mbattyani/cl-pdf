@@ -4,7 +4,7 @@
 
 ;; code 128 barcode from Lars Rustemeier
 
-(in-package pdf)
+(in-package #:pdf)
 
 ;;
 ;; Utils

@@ -4,22 +4,29 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package asdf)
+(in-package :common-lisp-user)
+
+(defpackage #:cl-pdf-system
+    (:use #:cl #:asdf))
+
+(in-package #:cl-pdf-system)
 
 ;;;Choose the zlib implementation you want to use (only one!)
-(pushnew :use-salza-zlib cl:*features*)
-;(pushnew :use-uffi-zlib cl:*features*)
-;(pushnew :use-abcl-zlib cl:*features*)
-;(pushnew :use-no-zlib cl:*features*)
+(eval-when (:load-toplevel :compile-toplevel :execute)
+  (pushnew :use-salza-zlib *features*)
+  ;;(pushnew :use-uffi-zlib *features*)
+  ;;(pushnew :use-abcl-zlib *features*)
+  ;;(pushnew :use-no-zlib *features*)
+  )
 
 #-(or use-uffi-zlib use-salza-zlib use-abcl-zlib use-no-zlib)
-(Error "You must choose which zlib version you want to use")
+(error "You must choose which zlib implementation you want to use!")
 
-#-(or uffi (not use-uffi-zlib))
+#+(and (not uffi) use-uffi-zlib)
 (ignore-errors
   (print "Trying to load UFFI:")
-  (asdf:operate 'asdf:load-op :uffi)
-  (pushnew :uffi cl:*features*)
+  (operate 'load-op :uffi)
+  (pushnew :uffi *features*)
   (print "UFFI loaded."))
 
 (load (merge-pathnames "iterate/iterate.asd" *load-truename*))
@@ -38,7 +45,7 @@
   :description "Common Lisp PDF Generation Library"
   :long-description "The cl-pdf package provides a stand-alone Common Lisp library to generate PDF files."
   :perform (load-op :after (op cl-pdf)
-		    (pushnew :cl-pdf cl:*features*))
+		    (pushnew :cl-pdf *features*))
   :components ((:file "defpackage")
 	       (:file "config" :depends-on ("defpackage"))
 	       #+use-uffi-zlib (:file "init" :depends-on ("config"))

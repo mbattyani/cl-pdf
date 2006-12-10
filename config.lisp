@@ -2,7 +2,7 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package pdf)
+(in-package #:pdf)
 
 ;;; This file contains some special variables which need to be set
 ;;; depending on your Lisp implementation/OS/installation.
@@ -22,6 +22,11 @@
 
 (defvar *compress-streams* nil
   "Enables the internal streams compression by zlib")
+
+(defvar *embed-fonts* :default
+  "t, nil, or :default (let make-font-dictionary and font-descriptor decide for themselves)")
+
+(defvar *compress-fonts* t "nil or decode filter designator")
 
 ;the cl-pdf base directory
 (defvar *cl-pdf-base-directory*

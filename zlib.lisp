@@ -2,7 +2,7 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package pdf)
+(in-package #:pdf)
 
 ;;; UFFI zlib
 
@@ -58,6 +58,7 @@
 
 #+use-abcl-zlib
 (defun load-zlib (&optional force)
+  (declare (ignore force))
   (setf *compress-streams* t))
 
 #+use-abcl-zlib
@@ -81,6 +82,7 @@
 
 #+use-salza-zlib
 (defun load-zlib (&optional force)
+  (declare (ignore force))
   (setf *compress-streams* t))
 
 #+use-salza-zlib
@@ -103,6 +105,7 @@
 ;;; no-zlib
 #+use-no-zlib
 (defun load-zlib (&optional force)
+  (declare (ignore force))
   (setf *compress-streams* nil))
 
 #+use-no-zlib

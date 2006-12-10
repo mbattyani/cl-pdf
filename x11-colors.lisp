@@ -1,4 +1,4 @@
-(in-package :pdf)
+(in-package #:pdf)
 
 #-lispworks
 (defvar *x11-colors*
