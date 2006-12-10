@@ -38,7 +38,6 @@
 	  (if encoding
 	      (get-encoding encoding)
 	      (extract-font-metrics-encoding font-metrics)))
-    (setf (gethash (list (name font) (encoding font)) *font-cache*) font)
     (if (eql (keyword-name (encoding font)) :unicode-encoding)
         (setf (pdf-widths font) (pdf-widths font-metrics)
               (characters font) (encoding-vector font-metrics)
@@ -62,7 +61,8 @@
                (setf hyphen-code i
                      (hyphen-code font) i
                      (hyphen-char font) (code-char i)))))
-    (compute-kern-pairs font)))
+    (compute-kern-pairs font)
+    (setf (gethash (list (name font) (encoding font)) *font-cache*) font)))
 
 (defun compute-kern-pairs (font)
   (let ((char-to-code (make-hash-table))
