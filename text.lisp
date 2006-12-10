@@ -2,7 +2,7 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package pdf)
+(in-package #:pdf)
 
 ;;; Basic (and crude) text layout functions
 ;;; use cl-typesetting for nice text layout functions

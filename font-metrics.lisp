@@ -2,7 +2,7 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package pdf)
+(in-package #:pdf)
 
 ;;Many thanks to Alexey Dejneka (adejneka@comail.ru) who finished the parsing of the AFM files.
 
@@ -326,8 +326,8 @@
   (declare (ignore font-metrics))
   "Type1")
 
-(defmethod font-descriptor (font-metrics &key embed (errorp nil))
-  (declare (ignore font-metrics embed))
+(defmethod font-descriptor (font-metrics &key (errorp nil) &allow-other-keys)
+  (declare (ignore font-metrics))
   (if errorp
       (error "Generic fonts do not have descriptors.")
       nil))

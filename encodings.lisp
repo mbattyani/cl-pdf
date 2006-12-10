@@ -2,11 +2,13 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package pdf)
+(in-package #:pdf)
 
 (defvar *default-encoding* :win-ansi-encoding)
 
 (defvar *encodings* (make-hash-table :test #'equal))
+
+(defvar *standard-encoding*)
 
 (defclass encoding ()
   ((name :accessor name :initform nil :initarg :name)
@@ -15,7 +17,7 @@
    (char-names :accessor char-names :initform nil :initarg :char-names)
    (char-codes :accessor char-codes :initform (make-hash-table :test #'equal))))
 
-(defmethod initialize-instance :after ((encoding encoding) &rest init-options &key &allow-other-keys)
+(defmethod initialize-instance :after ((encoding encoding) &key &allow-other-keys)
   (unless (and (name encoding)(char-names encoding))
     (error "You must provide a name and the codes to char names array (256) when you create an encoding"))
   (unless (keyword-name encoding)
@@ -50,8 +52,7 @@
 		 (when (or (and code (not range-started))(and (not code) range-started))
 		   (setf range-started code)
 		   (when code (vector-push-extend code differences)))))
-	  (loop with start-code = nil
-		for standard-char-name across (char-names from)
+	  (loop for standard-char-name across (char-names from)
 		for char-name across (char-names encoding)
 		for code from 0
 		do
@@ -88,7 +89,7 @@
 (defmethod standard-encoding ((encoding unicode-encoding))
   t)
 
-(defmethod initialize-instance :after ((encoding unicode-encoding) &rest init-options &key &allow-other-keys)
+(defmethod initialize-instance :after ((encoding unicode-encoding) &key &allow-other-keys)
   (setf (gethash encoding *encodings*) encoding
 	(gethash (name encoding) *encodings*) encoding
 	(gethash (keyword-name encoding) *encodings*) encoding))
@@ -96,7 +97,7 @@
 (defvar *unicode-encoding*
   (make-instance 'unicode-encoding))
 
-(defvar *standard-encoding*
+(setf *standard-encoding*
   (make-instance 'encoding :name "StandardEncoding" :keyword-name :standard-encoding
 		 :standard-encoding t :char-names #(
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil 
@@ -346,8 +347,7 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
 (defclass custom-encoding (encoding)
  ((base-encoding :initarg :base-encoding :reader base-encoding :initform nil)))
 
-(defmethod initialize-instance :after ((encoding custom-encoding) &rest initargs
-                                       &key &allow-other-keys)
+(defmethod initialize-instance :after ((encoding custom-encoding) &key &allow-other-keys)
   (with-slots (base-encoding) encoding
     (when (and base-encoding
                (or (stringp base-encoding) (symbolp base-encoding)))

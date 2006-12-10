@@ -2,7 +2,7 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package pdf)
+(in-package #:pdf)
 
 (defconstant +pfb-marker+ 128)
 (defconstant +pfb-ascii+ 1)
@@ -53,8 +53,7 @@
       (read-pfb-file pfb-file t1fm))
     t1fm))
 
-(defmethod font-descriptor ((t1fm t1-font-metrics)
-                            &key (embed *embed-fonts*) (errorp t))
+(defmethod font-descriptor ((t1fm t1-font-metrics) &key (embed *embed-fonts*) &allow-other-keys)
   (flet ((conv-dim (d) (round (* 1000 d))))
     (make-instance 'indirect-object :content
       (make-instance 'dictionary  ;:obj-number 0 :no-link t

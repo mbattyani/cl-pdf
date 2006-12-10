@@ -1,11 +1,12 @@
-(in-package cl-user)
-
 ;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(defpackage pdf
-  (:use common-lisp iterate)
+(in-package #:cl-user)
+
+(defpackage :pdf
+  (:nicknames :cl-pdf)
+  (:use :common-lisp :iterate)
   (:export
    #:*compress-streams* #:*zlib-search-paths* #:*zlib-loaded* #:load-zlib
    #:*max-number-of-pages* #:max-number-of-pages-reached
@@ -43,4 +44,4 @@
    #:load-t1-font #:load-ttu-font #:encoding #:get-encoding
    #:draw-bar-code128 #:*page-number*
    #:test-template #:make-template-from-page #:add-templates-to-page #:draw-template
-))
+   ))

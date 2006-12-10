@@ -2,7 +2,7 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package :pdf)
+(in-package #:pdf)
 
 ;;; PNG Images code proposal by Dmitri Ivanov
 ;;; Notes:
@@ -115,9 +115,9 @@
 		     :width width :height height  :data data
                      :bits-per-color bits-per-color  :palette palette  :mask mask)))))
 
-(defmethod make-image ((png png-image) &key type)
+(defmethod make-image ((png png-image) &key &allow-other-keys)
   ;; For color key masking, the Mask entry is an array of 2*N integers,
-  ;; [min1 max1 ¥ minN maxN], where N is the number of color components in the
+  ;; [min1 max1 ... minN maxN], where N is the number of color components in the
   ;; image's color space.
   (let* ((nb-components (nb-components png))
          (palette (palette png))

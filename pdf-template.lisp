@@ -45,7 +45,7 @@
 
 ;;;## Package definition
 
-(in-package :pdf)
+(in-package #:pdf)
 
 ;;;## Template Objects
 

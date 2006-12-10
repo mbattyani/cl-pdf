@@ -6,7 +6,7 @@
 ;; (It's much nicer than my original LALR parser ;-)
 ;; See the example at the end for usage.
 
-(in-package pdf)
+(in-package #:pdf)
 
 (defvar *pdf-input-stream* nil)
 (defvar *indirect-objects* nil)

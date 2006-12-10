@@ -2,7 +2,7 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package pdf)
+(in-package #:pdf)
 
 (defvar *font* nil
   "The current font in text mode")
@@ -11,11 +11,6 @@
   "The current font in text mode")
 
 (defvar *font-cache* (make-hash-table :test #'equal))
-
-(defvar *embed-fonts* :default
-  "t, nil, or :default (methods make-font-dictionary and font-descriptor decide)")
-
-(defvar *compress-fonts* t "nil or decode filter designator")
 
 (defgeneric font-descriptor (font-metrics &key embed errorp))
 
@@ -33,7 +28,7 @@
   (print-unreadable-object (self stream :identity t :type t)
     (format stream "~a" (name self))))
 
-(defmethod initialize-instance :after ((font font) &rest init-options &key encoding &allow-other-keys)
+(defmethod initialize-instance :after ((font font) &key encoding &allow-other-keys)
   (let ((font-metrics (gethash (name font) *font-metrics*)))
     (unless font-metrics (error "Font ~s not found" (name font)))
     (setf (font-metrics font) font-metrics)

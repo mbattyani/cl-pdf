@@ -2,7 +2,7 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-(in-package pdf)
+(in-package #:pdf)
 
 ;;;text functions
 
@@ -319,7 +319,7 @@
   (apply #'make-image (merge-pathnames object (make-pathname :type type))
          args))
 
-(defmethod make-image ((jpeg jpeg-image) &key type)
+(defmethod make-image ((jpeg jpeg-image) &key &allow-other-keys)
   (make-instance 'pdf:image
          :bits (data jpeg)
          :width (width jpeg) :height (height jpeg)

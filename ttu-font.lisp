@@ -8,7 +8,7 @@
 
 ;;; Support for TrueTypeUnicode fonts
 
-(in-package pdf)
+(in-package #:pdf)
 
 (defclass ttu-font-metrics (font-metrics)
   ((c2g :accessor c2g
@@ -37,8 +37,7 @@
 
 ;;; example: (pdf:load-ttu-font #P"/tmp/arial.ufm" #P"/tmp/arial.ttf")
 
-(defmethod font-descriptor ((fm ttu-font-metrics)
-			    &key (embed *embed-fonts*) (errorp t))
+(defmethod font-descriptor ((fm ttu-font-metrics) &key (embed *embed-fonts*) &allow-other-keys)
   (flet ((conv-dim (d) (round (* 1000 d))))
     (make-instance
      'indirect-object
@@ -103,9 +102,8 @@
 	   :content (c2g font)
 	   :no-compression t))))))
 
-(defmethod make-dictionary
-    ((fm ttu-font-metrics)
-     &key font (encoding (encoding font)) (embed *embed-fonts*))
+(defmethod make-dictionary ((fm ttu-font-metrics)
+                            &key font (encoding (encoding font)) (embed *embed-fonts*))
   (let* ((font-descriptor (font-descriptor fm :embed embed :errorp nil))
 	 (cid-font (make-instance
 		    'cid-font
@@ -120,6 +118,10 @@
        ("/Subtype" . ,(add-/ (font-type fm)))
        ("/BaseFont" . ,(add-/ (concatenate 'string (font-name fm) "-UCS")))
        ("/Encoding" . "/Identity-H")
+       ;; TODO shouldn't it be this? if not, then delete encoding keyword argument...
+       #+nil("/Encoding" . (if (standard-encoding encoding)
+                          (add-/ (name encoding))
+                          (find-encoding-object encoding)))
        ("/DescendantFonts"
 	. ,(vector
 	    (make-instance
