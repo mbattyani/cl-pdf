@@ -23,8 +23,6 @@
 
 (defgeneric make-dictionary (thing &key &allow-other-keys))
 
-(defgeneric font-descriptor (font-metrics &key embed errorp))
-
 (defclass dictionary ()
   ((dict-values :accessor dict-values :initform nil :initarg :dict-values)))
 
@@ -212,6 +210,34 @@
   #+lispworks `(lw:string-append ,@args)
   #-lispworks `(concatenate 'string ,@args))
 
+(defun pdf-string (obj &key (unicode :default))
+ ;;; Used to embrace a pdf string used in places other than content streams,
+  ;; e.g. titles, annotations etc.
+  ;; Args: unicode  If true or defaults to true, the PDF text string is encoded in Unicode
+  ;;	   lang ?
+  ;; Q: Rename or create separate pdf-text-string?
+  (let ((string (if (stringp obj) obj (princ-to-string obj))))
+    (when (eq unicode :default)
+      (setq unicode (notevery #+lispworks #'lw:base-char-p
+                              #-lispworks (lambda (char) (<= (char-code char) 255))
+                              string)))
+    (with-output-to-string (stream nil :element-type 'base-char)
+      (write-char #\( stream)
+      (when unicode			; write the Unicode byte order marker U+FEFF
+        (write-char #.(code-char 254) stream) (write-char #.(code-char 255) stream))
+      (loop for char across string
+            for code = (char-code char)
+            if unicode
+            do (write-char (code-char (ldb (byte 8 8) code)) stream)	; hi
+               (write-char (code-char (ldb (byte 8 0) code)) stream)	; lo
+            else if (> code 255)
+            do (write-char (code-char (ldb (byte 8 0) code)) stream)	; lo
+            else do (case char ((#\( #\) #\\)
+                                (write-char #\\ stream)))
+                      (write-char char stream))
+      (write-char #\) stream))))
+
+#+old-pdf-encoding
 (defun pdf-string (obj)
  "Used to embrace a pdf string used in places other than content streams, e.g. annotations."
   (let ((string (if (stringp obj) obj (princ-to-string obj))))
@@ -397,10 +423,8 @@
 (defclass annotation2 (indirect-object)
   ())
 
-(defmethod initialize-instance :after ((annotation annotation2) &key
-				       rect type text
+(defmethod initialize-instance :after ((annotation annotation2) &key rect text
 				       &allow-other-keys)
-  (enforce-/ type)
   (vector-push-extend annotation (annotations *page*))
   (setf (content annotation)
 	(make-instance 'dictionary
@@ -422,6 +446,17 @@
 	(write-char #\Newline *pdf-stream*))
   (write-line " >>" *pdf-stream*))
 
+(defmethod write-stream-content ((content string))
+  ;; Args: content Base string, may include
+  ;;	   - either one-byte codes (already converted to external format if needed)
+  ;;	   - or Unicode two-byte character codes (big-endian CIDs)
+  #+pdf-binary
+  (loop for char across content
+        do (write-byte (ldb (byte 8 0) (char-code char)) *pdf-stream*))
+  #-pdf-binary
+  (write-sequence obj *pdf-stream*))
+
+#+old-pdf-encoding
 (defmethod write-stream-content ((obj string))
   (write-sequence obj *pdf-stream*))
 
@@ -525,9 +560,13 @@
        (format s "~%>>~%startxref~%~d~%%%EOF~%" startxref))))
 
 (defmethod write-document ((filename pathname) &optional (document *document*))
-   (with-open-file (s filename :direction :output :if-exists :supersede
-		      :external-format +external-format+)
-     (write-document s document)))
+   (with-open-file (stream filename
+                           :direction :output :if-exists :supersede
+                           :element-type #+pdf-binary '(unsigned-byte 8) 
+                                         #-pdf-binary 'base-char
+                           :external-format +external-format+)
+     (write-document stream document)
+     filename))				; indicate that operation succeeded
 
 (defmethod write-document ((filename string) &optional (document *document*))
   (write-document (pathname filename) document))

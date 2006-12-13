@@ -78,6 +78,34 @@
 		     (setf (gethash (+ (* code1 65536) code2) kernings) (car v)))))
 	     (kernings (font-metrics font)))))
 
+
+(defgeneric get-char-metrics (char-or-code font encoding)
+ ;;; This generic is intended to replace get-char.
+  ;; Args: char-or-code  Lisp character or its char-code
+  ;; TODO: Customize your lisp implementation in treating charset.
+  ;; CAUTION: Don't use force-char-code from di-pdf.lisp!
+ (:method (char-or-code font encoding)
+  (aref (characters font) ;(force-char-code char-or-code)
+        (if (characterp char-or-code) (char-code char-or-code) char-or-code))))
+
+(defmethod get-char-metrics ((code integer) font (encoding custom-encoding))
+  (aref (characters font)
+        (let ((charset (charset encoding)))
+          (if charset
+              #+lispworks (ef:char-external-code (code-char code) charset)
+              #-lispworks code
+              code))))
+
+(defmethod get-char-metrics ((char character) font (encoding custom-encoding))
+ ;;; Map Unicode char code to code belonging [0-255] range.
+  (aref (characters font)
+        (let ((charset (charset encoding)))
+          (if charset
+              #+lispworks (ef:char-external-code char charset)
+              #-lispworks (char-code char)
+              (char-code char)))))
+
+
 (defun get-char (code font)
   (aref (characters font) code))
 
@@ -87,9 +115,25 @@
       (if (characterp ,char) (char-code ,char) ,char))))
  
 (defun get-char-width (char-or-code font &optional font-size)
+  (let ((char-metrics (get-char-metrics char-or-code font (encoding font))))
+    (if font-size (* (width char-metrics) font-size) (width char-metrics))))
+
+#+old-pdf-encoding
+(defun get-char-width (char-or-code font &optional font-size)
   (let ((char (aref (characters font) (force-char-code char-or-code))))
     (if font-size (* (width char) font-size) (width char))))
 
+(defun get-char-size (char-or-code font &optional font-size)
+  (let* ((char-metrics (get-char-metrics char-or-code font (encoding font)))
+	 (width (width char-metrics))
+	 (bbox (bbox char-metrics))
+	 (ascender (aref bbox 3))
+	 (descender (aref bbox 1)))
+    (if font-size
+	(values (* width font-size)(* ascender font-size)(* descender font-size))
+	(values width ascender descender))))
+
+#+old-pdf-encoding
 (defun get-char-size (char-or-code font &optional font-size)
   (let* ((char (aref (characters font) (force-char-code char-or-code)))
 	 (width (width char))
@@ -100,6 +144,15 @@
 	(values (* width font-size)(* ascender font-size)(* descender font-size))
 	(values width ascender descender))))
 
+(defun get-char-italic-correction (char-or-code font &optional font-size)
+  (let* ((char-metrics (get-char-metrics char-or-code font (encoding font)))
+	 (left (left-italic-correction char-metrics))
+	 (right (right-italic-correction char-metrics)))
+    (if font-size
+	(values (* left font-size)(* right font-size))
+	(values left right))))
+
+#+old-pdf-encoding
 (defun get-char-italic-correction (char-or-code font &optional font-size)
   (let* ((char (aref (characters font) (force-char-code char-or-code)))
 	 (left (left-italic-correction char))
@@ -116,6 +169,16 @@
 	(values (* left font-size)(* right font-size))
 	(values left right))))
 
+(defun get-kerning (char1 char2 font &optional font-size)
+  (let* ((encoding (encoding font))
+         (char-metrics1 (get-char-metrics char1 font encoding))
+         (char-metrics2 (get-char-metrics char2 font encoding))
+         (kerning (gethash (+ (ash (code char-metrics1) 16) (code char-metrics2))
+                           (kernings font)
+                           0)))
+    (if font-size (* font-size kerning) kerning)))
+
+#+old-pdf-encoding
 (defun get-kerning (char1 char2 font &optional font-size)
   (let ((kerning (gethash (+ (* (force-char-code char1) 65536)
 			     (force-char-code char2))(kernings font) 0)))

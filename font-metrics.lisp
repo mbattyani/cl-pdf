@@ -349,6 +349,20 @@
               ("/Widths" . ,(pdf-widths font))
               ("/FontDescriptor" . ,font-descriptor))) )) ))
 
+
+(defun extract-font-metrics-encoding (font-metrics)
+ ;; Make extract-font-metrics-encoding generic?
+  (let ((encoding (or (get-encoding (encoding-scheme font-metrics))
+		      (get-encoding (font-name font-metrics)))))
+    (if encoding
+	encoding
+	(make-instance 'single-byte-encoding :name (font-name font-metrics)
+		       :standard-encoding nil
+		       :char-names (map 'vector #'(lambda (char)
+						    (and char (name char)))
+					(encoding-vector font-metrics))))))
+
+#+old-pdf-encoding
 (defun extract-font-metrics-encoding (font-metrics)
   (let ((encoding (or (get-encoding (encoding-scheme font-metrics))
 		      (get-encoding (font-name font-metrics)))))

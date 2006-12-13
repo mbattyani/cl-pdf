@@ -36,9 +36,14 @@
 
 ;; The *afm-files-directories* is only for the 14 predefined fonts.
 ;; other fonts must have their afm files read only when they are loaded
+;; Rationale for redefinition:
+;;  Neither of the versions of search-for-file can search the original value of
+;;  *afm-files-directories* (#P"cl-pdf/afm/*.afm") as it contains wildcards!
 (defparameter *afm-files-directories*
-  (list (merge-pathnames #P"afm/*.afm" *cl-pdf-base-directory*))
-  "The directory containing the Adobe Font Metrics files for the 14 predefined fonts")
+  (list (merge-pathnames #P"afm/" *cl-pdf-base-directory*))
+  "The list of directories containing the Adobe Font Metrics and other font files.
+ Can be expanded by additionally loaded modules.")
+
 
 ;; define the :pdf-binary feature if your Lisp implementation accepts
 ;; to write binary sequences to character streams

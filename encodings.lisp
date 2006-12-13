@@ -8,23 +8,37 @@
 
 (defvar *encodings* (make-hash-table :test #'equal))
 
-(defvar *standard-encoding*)
+(defun get-encoding (encoding-designator)
+  (gethash encoding-designator *encodings*))
+
+;;; Abstract encoding
 
 (defclass encoding ()
-  ((name :accessor name :initform nil :initarg :name)
-   (keyword-name :accessor keyword-name :initform nil :initarg :keyword-name)
-   (standard-encoding :accessor standard-encoding :initform nil :initarg :standard-encoding)
-   (char-names :accessor char-names :initform nil :initarg :char-names)
-   (char-codes :accessor char-codes :initform (make-hash-table :test #'equal))))
+ ((name :accessor name :initform nil :initarg :name)
+  (keyword-name :accessor keyword-name :initform nil :initarg :keyword-name)
+  (standard-encoding :accessor standard-encoding :initform nil :initarg :standard-encoding)))
 
 (defmethod initialize-instance :after ((encoding encoding) &key &allow-other-keys)
-  (unless (and (name encoding)(char-names encoding))
-    (error "You must provide a name and the codes to char names array (256) when you create an encoding"))
+  (unless (name encoding)
+    (error "You must provide a name when you create an encoding."))
   (unless (keyword-name encoding)
     (setf (keyword-name encoding)(intern (string-upcase (name encoding)) :keyword)))
   (setf (gethash encoding *encodings*) encoding
 	(gethash (name encoding) *encodings*) encoding
-	(gethash (keyword-name encoding) *encodings*) encoding)
+	(gethash (keyword-name encoding) *encodings*) encoding))
+
+(defmethod print-object ((self encoding) stream)
+  (print-unreadable-object (self stream :identity t :type t)
+    (format stream "~a" (name self))))
+
+
+(defclass single-byte-encoding (encoding)
+ ((char-names :accessor char-names :initform nil :initarg :char-names)
+  (char-codes :accessor char-codes :initform (make-hash-table :test #'equal))))
+
+(defmethod initialize-instance :after ((encoding single-byte-encoding) &key &allow-other-keys)
+  (unless (char-names encoding)
+    (error "You must provide code-to-char-name array (256) when you create a single-byte encoding."))
   (loop with char-codes = (char-codes encoding)
 	for char-name across (char-names encoding)
 	for code from 0
@@ -32,73 +46,15 @@
 
 (defmethod make-dictionary ((encoding encoding) &key &allow-other-keys)
   (with-slots (base-encoding) encoding
-    (make-instance 'dictionary
-      :dict-values
+    (make-instance 'dictionary :dict-values
       `(("/Type" . "/Encoding")
 	("/Differences" . ,(compute-encoding-differences encoding nil))))))
 
-(defmethod print-object ((self encoding) stream)
-  (print-unreadable-object (self stream :identity t :type t)
-    (format stream "~a" (name self))))
+;;; Built-in encoding instances
 
-(defun get-encoding (encoding-designator)
-  (gethash encoding-designator *encodings*))
-
-(defun compute-encoding-differences (encoding &optional (from *standard-encoding*))
-  (let ((differences (make-array 20 :fill-pointer 0 :adjustable t))
-	(range-started nil))
-    (if from
-	(flet ((start-range (code)
-		 (when (or (and code (not range-started))(and (not code) range-started))
-		   (setf range-started code)
-		   (when code (vector-push-extend code differences)))))
-	  (loop for standard-char-name across (char-names from)
-		for char-name across (char-names encoding)
-		for code from 0
-		do
-		(cond
-		  ((and (not char-name) standard-char-name)
-		   (start-range code) (vector-push-extend ".notdef" differences))
-		  ((and char-name (not (equal char-name standard-char-name)))
-		   (start-range code)
-		   (vector-push-extend (add-/ char-name) differences))
-		  (t (start-range nil)))))
-	(full-encoding-differences encoding))
-	differences))
-
-;;; Just put all...
-(defun full-encoding-differences (encoding)
-  (let ((differences (make-array 20 :fill-pointer 0 :adjustable t)))
-    (vector-push-extend 0 differences)
-    (loop for char-name across (char-names encoding)
-	  for code from 0
-	  do (if char-name
-		 (vector-push-extend (concatenate 'string "/" char-name) differences)
-		 (vector-push-extend "/.notdef" differences)))
-    differences))
-
-(defclass unicode-encoding ()
-  ())
-
-(defmethod name ((encoding unicode-encoding))
-  "UnicodeEncoding")
-
-(defmethod keyword-name ((encoding unicode-encoding))
-  :unicode-encoding)
-
-(defmethod standard-encoding ((encoding unicode-encoding))
-  t)
-
-(defmethod initialize-instance :after ((encoding unicode-encoding) &key &allow-other-keys)
-  (setf (gethash encoding *encodings*) encoding
-	(gethash (name encoding) *encodings*) encoding
-	(gethash (keyword-name encoding) *encodings*) encoding))
-
-(defvar *unicode-encoding*
-  (make-instance 'unicode-encoding))
-
-(setf *standard-encoding*
-  (make-instance 'encoding :name "StandardEncoding" :keyword-name :standard-encoding
+(defparameter *standard-encoding*
+  (make-instance 'single-byte-encoding
+                 :name "StandardEncoding"  :keyword-name :standard-encoding
 		 :standard-encoding t :char-names #(
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil 
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil "space" 
@@ -126,9 +82,10 @@ nil nil nil nil "Lslash" "Oslash" "OE" "ordmasculine" nil nil nil nil
 nil "ae" nil nil nil "dotlessi" nil nil "lslash" "oslash" "oe" 
 "germandbls" nil nil nil nil )))
 
-(defvar *mac-roman-encoding*
-  (make-instance 'encoding :name "MacRomanEncoding" :keyword-name :mac-roman-encoding
-		 :standard-encoding t :char-names #(
+(defparameter *mac-roman-encoding*
+  (make-instance 'single-byte-encoding
+                 :name "MacRomanEncoding"  :keyword-name :mac-roman-encoding
+		 :standard-encoding t  :char-names #(
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil 
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil "space" 
 "exclam" "quotedbl" "numbersign" "dollar" "percent" "ampersand" 
@@ -161,9 +118,10 @@ nil nil nil "ordfeminine" "ordmasculine" nil "ae" "oslash"
 "tilde" "macron" "breve" "dotaccent" "ring" "cedilla" "hungarumlaut" 
 "ogonek" "caron" )))
 
-(defvar *win-ansi-encoding*
-  (make-instance 'encoding :name "WinAnsiEncoding" :keyword-name :win-ansi-encoding
-		 :standard-encoding t :char-names #(
+(defparameter *win-ansi-encoding*
+  (make-instance 'single-byte-encoding
+                 :name "WinAnsiEncoding"  :keyword-name :win-ansi-encoding
+		 :standard-encoding t  :char-names #(
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil 
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil "space" 
 "exclam" "quotedbl" "numbersign" "dollar" "percent" "ampersand" 
@@ -197,9 +155,10 @@ nil nil nil nil nil nil nil nil nil nil nil nil nil nil "space"
 "oacute" "ocircumflex" "otilde" "odieresis" "divide" "oslash" "ugrave" 
 "uacute" "ucircumflex" "udieresis" "yacute" "thorn" "ydieresis" )))
 
-(defvar *pdf-doc-encoding*
-  (make-instance 'encoding :name "PDFDocEncoding" :keyword-name :pdf-doc-encoding
-		 :standard-encoding t :char-names #(
+(defparameter *pdf-doc-encoding*
+  (make-instance 'single-byte-encoding
+                 :name "PDFDocEncoding"  :keyword-name :pdf-doc-encoding
+		 :standard-encoding t  :char-names #(
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil 
 nil nil nil nil nil nil "breve" "caron" "circumflex" "dotaccent" 
 "hungarumlaut" "ogonek" "ring" "tilde" "space" "exclam" "quotedbl" 
@@ -233,9 +192,10 @@ nil nil nil nil nil nil "breve" "caron" "circumflex" "dotaccent"
 "oacute" "ocircumflex" "otilde" "odieresis" "divide" "oslash" "ugrave" 
 "uacute" "ucircumflex" "udieresis" "yacute" "thorn" "ydieresis" )))
 
-(defvar *mac-expert-encoding*
-  (make-instance 'encoding :name "MacExpertEncoding" :keyword-name :mac-expert-encoding
-		 :standard-encoding t :char-names #(
+(defparameter *mac-expert-encoding*
+  (make-instance 'single-byte-encoding
+                 :name "MacExpertEncoding"  :keyword-name :mac-expert-encoding
+		 :standard-encoding t  :char-names #(
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil 
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil "space" 
 "exclamsmall" "Hungarumlautsmall" "centoldstyle" "dollaroldstyle" 
@@ -276,9 +236,10 @@ nil nil nil nil "lsuperior" "Ogoneksmall" "Brevesmall" "Macronsmall"
 "bsuperior" "nsuperior" "msuperior" "commasuperior" "periodsuperior" 
 "Dotaccentsmall" "Ringsmall" nil nil nil nil )))
 
-(defvar *symbol-encoding*
-  (make-instance 'encoding :name "SymbolEncoding" :keyword-name :symbol-encoding
-		 :standard-encoding t :char-names #(
+(defparameter *symbol-encoding*
+  (make-instance 'single-byte-encoding
+                 :name "SymbolEncoding"  :keyword-name :symbol-encoding
+		 :standard-encoding t  :char-names #(
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil 
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil "space" 
 "exclam" "universal" "numbersign" "existential" "percent" "ampersand" 
@@ -315,8 +276,9 @@ nil nil nil nil nil nil nil nil nil "Euro" "Upsilon1" "minute"
 "bracerighttp" "bracerightmid" "bracerightbt" nil )))
 
 (defvar *zapf-dingbats-encoding*
-  (make-instance 'encoding :name "ZapfDingbatsEncoding" :keyword-name :zapf-dingbats-encoding
-		 :standard-encoding t :char-names #(
+  (make-instance 'single-byte-encoding
+                 :name "ZapfDingbatsEncoding"  :keyword-name :zapf-dingbats-encoding
+		 :standard-encoding t  :char-names #(
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil 
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil "space" "a1" 
 "a2" "a202" "a3" "a4" "a5" "a119" "a118" "a117" "a11" "a12" "a13" "a14" 
@@ -340,12 +302,51 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
 "a181" "a200" "a182" nil "a201" "a183" "a184" "a197" "a185" "a194" 
 "a198" "a186" "a195" "a187" "a188" "a189" "a190" "a191" nil )))
 
-;;; custom encoding by Dmitri Ivanov: divanov_nosp@m_aha.ru (replace _nosp@m_ by @ to reply)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Custom Encoding
 
-(defclass custom-encoding (encoding)
- ((base-encoding :initarg :base-encoding :reader base-encoding :initform nil)))
+(defun compute-encoding-differences (encoding &optional (from *standard-encoding*))
+  (let ((differences (make-array 20 :fill-pointer 0 :adjustable t))
+	(range-started nil))
+    (if from
+	(flet ((start-range (code)
+		 (when (or (and code (not range-started))(and (not code) range-started))
+		   (setf range-started code)
+		   (when code (vector-push-extend code differences)))))
+	  (loop ;with start-code = nil
+		for standard-char-name across (char-names from)
+		for char-name across (char-names encoding)
+		for code from 0
+		do
+		(cond
+		  ((and (not char-name) standard-char-name)
+		   (start-range code) (vector-push-extend ".notdef" differences))
+		  ((and char-name (not (equal char-name standard-char-name)))
+		   (start-range code)
+		   (vector-push-extend (add-/ char-name) differences))
+		  (t (start-range nil)))))
+	(full-encoding-differences encoding))
+	differences))
+
+;;; Just put all...
+(defun full-encoding-differences (encoding)
+  (let ((differences (make-array 20 :fill-pointer 0 :adjustable t)))
+    (vector-push-extend 0 differences)
+    (loop for char-name across (char-names encoding)
+	  for code from 0
+	  do (if char-name
+		 (vector-push-extend (concatenate 'string "/" char-name) differences)
+		 (vector-push-extend "/.notdef" differences)))
+    differences))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Custom encoding
+
+(defclass custom-encoding (single-byte-encoding)
+ ((base-encoding :initarg :base-encoding :reader base-encoding :initform nil)
+  ;; Implementation-dependent value that specifeis a mapping
+  ;;  from Unicode character codes (Lisp characters)
+  ;;  to one-byte character codes belonging [0-255] range.
+  ;; Q: Store char-to-code hash-table?
+  (charset :accessor charset :initarg :charset :initform nil)))
 
 (defmethod initialize-instance :after ((encoding custom-encoding) &key &allow-other-keys)
   (with-slots (base-encoding) encoding
@@ -354,11 +355,9 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
       (setf base-encoding (gethash base-encoding *encodings* base-encoding)))))
 
 
-
 (defmethod make-dictionary ((encoding custom-encoding) &key &allow-other-keys)
   (with-slots (base-encoding) encoding
-    (make-instance 'dictionary
-      :dict-values
+    (make-instance 'dictionary :dict-values
       `(("/Type" . "/Encoding")
         ,@(when base-encoding
             `(("/BaseEncoding" . ,(add-/ (name base-encoding)))
@@ -371,11 +370,12 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
 ;;;  results, so it should be specified explicitly for get-font.
 ;;;  It seems that get-font should not have any default for the encoding parameter.
 
-(defvar *win-1251-encoding*
+(defparameter *win-1251-encoding*
   (make-instance 'custom-encoding
-                 :name "Win1251Encoding" :keyword-name :win-1251-encoding
-                 :base-encoding :standard-encoding   ;:win-ansi-encoding doesn't work!
-		 :standard-encoding nil                 
+                 :name "Win1251Encoding"  :keyword-name :win-1251-encoding
+                 :base-encoding :standard-encoding	;:win-ansi-encoding doesn't work!
+                 :charset #+lispworks 1251		; passed to ef:char-external-code
+                          #-lispworks nil		; <- customize your lisp here
                  :char-names #(
 	nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil
 	nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil
@@ -411,3 +411,16 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
         "escyrillic" "tecyrillic" "ucyrillic" "efcyrillic" "khacyrillic" "tsecyrillic"
         "checyrillic" "shacyrillic" "shchacyrillic" "hardsigncyrillic" "yericyrillic"
         "softsigncyrillic" "ereversedcyrillic" "iucyrillic" "iacyrillic")))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Double-byte encodings
+
+(defclass unicode-encoding (encoding) ()
+ (:default-initargs
+  :name "UnicodeEncoding"
+  :keyword-name :unicode-encoding
+  :standard-encoding t))
+
+(defparameter *unicode-encoding* (make-instance 'unicode-encoding))
+
