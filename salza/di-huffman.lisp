@@ -165,6 +165,7 @@ the upper five bits and the value of the code in the lower 23.")
 
   (defun initialize-huffman (&optional force)
    ;;; Initialize distance and temporary tables at run time
+    ;; Called by: make-deflate-stream
     (when (and %initialized% (not force))
       (return-from initialize-huffman))
 
