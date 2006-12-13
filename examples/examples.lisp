@@ -406,7 +406,7 @@
 	       (pdf:with-outline-level ((format nil "Page ~d" i)(pdf:register-page-reference))
 		 (let* ((helvetica (pdf:get-font "Helvetica" :win-ansi-encoding)))
 		   (pdf:draw-centered-text 297 800
-					   (format nil "Flocon de Koch (niveau ~d, ~d segments, périmètre ~,1f mm)" 
+					   (format nil "Koch's flake (Level ~d, ~d segments, perimeter ~,1f mm)" 
 						   i (* 3 (expt 4 i))(/ (* 180 (* 3 (expt 4 i)))(expt 3 i)))
 				      helvetica 18.0)
                    (pdf:translate 42 530)
@@ -501,7 +501,7 @@
 	    (format s "~2,'0x~2,'0x~2,'0x" r g b)))))))
 
 ;;; Example 9 is a Mandelbrot set from Yannick Gingras
-;;; Takes a long time...
+;;; Takes a long long time...
 
 (defun example9 (&optional (file #P"/tmp/ex9.pdf"))
   "draw a nice region of the Mandelbrot Set"
