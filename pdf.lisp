@@ -454,7 +454,7 @@
   (loop for char across content
         do (write-byte (ldb (byte 8 0) (char-code char)) *pdf-stream*))
   #-pdf-binary
-  (write-sequence obj *pdf-stream*))
+  (write-sequence content *pdf-stream*))
 
 #+old-pdf-encoding
 (defmethod write-stream-content ((obj string))
