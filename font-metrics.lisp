@@ -293,7 +293,7 @@
     (with-open-file (s filename :direction :input :external-format +external-format+)
       (setf font-metrics (afm-font-metrics s font-metrics-class)))
     (setf void-char (gethash "VoidCharacter" (characters font-metrics)))
-    (iter (for (name char-metrics) in-hashtable (characters font-metrics))
+    (iter (for (nil char-metrics) in-hashtable (characters font-metrics))
           (for gid = (index char-metrics))
           (for code = (code char-metrics))
           (when (and (<= 0 code #xfffe))
@@ -307,7 +307,7 @@
 	    (vector-push-extend (vector (round (* 1000 (width char-metrics)))) (cid-widths font-metrics))))
     (setf encoding-vector (make-array (1+ max-code) :initial-element void-char)
           pdf-widths (make-array (1+ max-code) :initial-element 0))
-    (iter (for (name char-metrics) in-hashtable (characters font-metrics))
+    (iter (for (nil char-metrics) in-hashtable (characters font-metrics))
           (for code = (code char-metrics))
           (when (<= min-code code max-code)
             (setf (aref encoding-vector code) char-metrics

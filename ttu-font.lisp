@@ -21,7 +21,6 @@
    (length1 :accessor length1)))
 
 (defmethod font-type ((fm ttu-font-metrics))
-  (declare (ignore fm))
   "Type0")
 
 (defun load-ttu-font (ufm-file &optional ttf-file)
@@ -104,6 +103,7 @@
 
 (defmethod make-dictionary ((fm ttu-font-metrics)
                             &key font (encoding (encoding font)) (embed *embed-fonts*))
+  (declare (ignore encoding))
   (let* ((font-descriptor (font-descriptor fm :embed embed :errorp nil))
 	 (cid-font (make-instance
 		    'cid-font

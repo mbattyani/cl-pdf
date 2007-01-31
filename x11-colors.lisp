@@ -769,7 +769,7 @@
 (defvar *x11-color-keyword-map*
   (let ((h (make-hash-table :test #'eq)))
     (dolist (c *x11-colors*)
-      (setf (gethash (intern (string-upcase (car c)) "KEYWORD")
+      (setf (gethash (intern (string-upcase (car c)) :keyword)
 		     h)
 	    (mapcar (lambda (v) (/ v 255.0))
 		    (cdr c))))

@@ -49,7 +49,9 @@
   :components ((:file "defpackage")
 	       (:file "config" :depends-on ("defpackage"))
 	       #+use-uffi-zlib (:file "init" :depends-on ("config"))
-	       (:file "zlib" :depends-on ("defpackage" #+use-uffi-zlib "init"))
+	       (:file "zlib" 
+		      :depends-on ("config" "defpackage"
+					    #+use-uffi-zlib "init"))
 	       (:file "font-metrics"  :depends-on ("config"))
 	       (:file "encodings"  :depends-on ("defpackage"))
 	       (:file "t1-font" :depends-on ("font-metrics" "encodings"))

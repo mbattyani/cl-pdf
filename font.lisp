@@ -85,6 +85,7 @@
   ;; TODO: Customize your lisp implementation in treating charset.
   ;; CAUTION: Don't use force-char-code from di-pdf.lisp!
  (:method (char-or-code font encoding)
+   (declare (ignore encoding))
   (aref (characters font) ;(force-char-code char-or-code)
         (if (characterp char-or-code) (char-code char-or-code) char-or-code))))
 

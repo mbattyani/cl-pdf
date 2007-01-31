@@ -31,6 +31,7 @@
     with while until adjoining nconcing appending
     nunioning unioning reducing accumulate accumulating))
 
-(export +clause-names+ '#:iterate)
+(eval-when (:compile-toplevel :load-toplevel :evaluate)
+  (export +clause-names+ '#:iterate))
 
 ;;; arch-tag: "b8bb0bb6-313c-11d8-abb9-000c76244c24"

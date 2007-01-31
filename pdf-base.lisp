@@ -109,15 +109,16 @@
 
 
 (defmethod write-to-page :before ((string string) encoding &optional escape)
-  (declare (ignore escape))
+  (declare (ignore escape encoding))
   (write-char #\( *page-stream*))
 
 (defmethod write-to-page :after ((string string) encoding &optional escape)
-  (declare (ignore escape))
+  (declare (ignore escape encoding))
   (write-string ") " *page-stream*))
 
 (defmethod write-to-page ((string string) encoding &optional escape)
-  (if escape
+   (declare (ignore encoding))
+   (if escape
       (loop for char across string
             do (case char
                  ((#\( #\) #\\)
@@ -175,14 +176,15 @@
 
 
 (defmethod write-to-page :before ((char character) encoding &optional escape)
-  (declare (ignore escape))
+  (declare (ignore escape encoding))
   (write-char #\( *page-stream*))
 
 (defmethod write-to-page :after ((char character) encoding &optional escape)
-  (declare (ignore escape))
+  (declare (ignore escape encoding))
   (write-char #\) *page-stream*))
 
 (defmethod write-to-page ((char character) encoding &optional escape)
+  (declare (ignore encoding))
   (when escape (case char
                  ((#\( #\) #\\) (write-char #\\ *page-stream*))))
   (write-char char *page-stream*))
