@@ -562,7 +562,7 @@
 (defmethod write-document ((filename pathname) &optional (document *document*))
    (with-open-file (stream filename
                            :direction :output :if-exists :supersede
-                           :element-type #+pdf-binary '(unsigned-byte 8) 
+                           :element-type #+pdf-binary #+sbcl :default #-sbcl'(unsigned-byte 8) 
                                          #-pdf-binary 'base-char
                            :external-format +external-format+)
      (write-document stream document)
