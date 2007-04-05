@@ -135,7 +135,7 @@
       (write-string string *page-stream*)))
 
 (defmethod write-to-page ((string string) (encoding custom-encoding) &optional escape)
-  (if (or escape #+lispworks (lw:text-string-p string))	; may include unicode
+  (if (or escape #+lispworks (lw:text-string-p string) #+allegro t)	; may include unicode
       (loop with charset = (charset encoding)
             for char across string do
             (case char
@@ -144,13 +144,19 @@
                  (write-char #\\ *page-stream*))
                (write-char char *page-stream*))
               (otherwise
-               (write-char (if (and charset #+lispworks (not (lw:base-char-p char)))
+               (write-char (if (and charset
+				    #+lispworks (not (lw:base-char-p char))
+				    #+allegro (not (standard-char-p char)))
                                #+lispworks (code-char (ef:char-external-code char charset))
-                               #-lispworks char
+			       #+allegro (code-char (char-external-code char charset))
+                               #-(or lispworks allegro) char
                                char)			; write-byte would be great
                            *page-stream*))))
       (write-string string *page-stream*)))
 
+#+allegro
+(defun char-external-code (char charset)
+  (aref (excl:string-to-octets (coerce `(,char) 'string) :external-format charset) 0))
 
 (defmethod write-to-page ((string string) (encoding unicode-encoding) &optional escape)
   (declare (ignore escape))
@@ -193,9 +199,13 @@
   (when escape (case char
                  ((#\( #\) #\\) (write-char #\\ *page-stream*))))
   (write-char (let ((charset (charset encoding)))
-                (if (and charset #+lispworks (not (lw:base-char-p char)))
+                (if (and charset 
+			 #+lispworks (not (lw:base-char-p char))
+			 #+allegro (not (standard-char-p char))
+			 )
                     #+lispworks (code-char (ef:char-external-code char charset))
-                    #-lispworks char
+		    #+allegro (code-char (char-external-code char charset))
+                    #-(or lispworks allegro) char
                     char))
               *page-stream*))
 

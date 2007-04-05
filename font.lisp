@@ -94,7 +94,8 @@
         (let ((charset (charset encoding)))
           (if charset
               #+lispworks (ef:char-external-code (code-char code) charset)
-              #-lispworks code
+	      #+allegro (char-external-code (code-char code) charset)
+              #-(or lispworks allegro) code
               code))))
 
 (defmethod get-char-metrics ((char character) font (encoding custom-encoding))
@@ -103,7 +104,8 @@
         (let ((charset (charset encoding)))
           (if charset
               #+lispworks (ef:char-external-code char charset)
-              #-lispworks (char-code char)
+	      #+allegro (char-external-code char charset)
+              #-(or lispworks allegro) (char-code char)
               (char-code char)))))
 
 

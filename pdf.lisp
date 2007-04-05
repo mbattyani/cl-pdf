@@ -559,11 +559,21 @@
 	 (write-object (docinfo document)))
        (format s "~%>>~%startxref~%~d~%%%EOF~%" startxref))))
 
+#-allegro
 (defmethod write-document ((filename pathname) &optional (document *document*))
    (with-open-file (stream filename
                            :direction :output :if-exists :supersede
                            :element-type #+pdf-binary #+sbcl :default #-sbcl'(unsigned-byte 8) 
                                          #-pdf-binary 'base-char
+                           :external-format +external-format+)
+     (write-document stream document)
+     filename))				; indicate that operation succeeded
+
+#+allegro
+(defmethod write-document ((filename pathname) &optional (document *document*))
+   (with-open-file (stream filename
+                           :direction :output :if-exists :supersede
+			   ;; when :element-type is not specified, simple-stream is created
                            :external-format +external-format+)
      (write-document stream document)
      filename))				; indicate that operation succeeded
@@ -591,4 +601,5 @@
 	 (with-output-to-string (*page-stream*)
 	   ,@body)))
      t))
+
 

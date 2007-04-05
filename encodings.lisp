@@ -375,7 +375,8 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
                  :name "Win1251Encoding"  :keyword-name :win-1251-encoding
                  :base-encoding :standard-encoding	;:win-ansi-encoding doesn't work!
                  :charset #+lispworks 1251		; passed to ef:char-external-code
-                          #-lispworks nil		; <- customize your lisp here
+		          #+allegro :1251
+                          #-(or lispworks allegro) nil		; <- customize your lisp here
                  :char-names #(
 	nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil
 	nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil
@@ -413,6 +414,85 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
         "softsigncyrillic" "ereversedcyrillic" "iucyrillic" "iacyrillic")))
 
 
+(defparameter *latin-2-encoding*
+  (make-instance 'pdf::custom-encoding 
+		 :name "Latin2Encoding"
+		 :keyword-name :latin-2-encoding
+		 :base-encoding :standard-encoding 
+		 :charset :latin-2
+		 :char-names #( nil nil nil nil nil nil nil nil
+nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil
+nil nil nil nil nil nil nil nil
+"space" "exclam" "quotedbl" "numbersign" "dollar" "percent"
+"ampersand" "quoteright" "parenleft" "parenright" "asterisk"
+"plus" "comma" "minus" "period" "slash" "zero" "one" "two"
+"three" "four" "five" "six" "seven" "eight" "nine" "colon"
+"semicolon" "less" "equal" "greater" "question" "at" "A" "B"
+"C" "D" "E" "F" "G" "H" "I" "J" "K" "L" "M" "N" "O"
+"P" "Q" "R" "S" "T" "U" "V" "W" "X" "Y" "Z" "bracketleft" "backslash"
+"bracketright" "asciicircum" "underscore" "quoteleft" "a" "b" "c"
+"d" "e" "f" "g" "h" "i" "j" "k" "l" "m" "n" "o" "p" "q"
+"r" "s" "t" "u" "v" "w" "x" "y" "z" "braceleft" "bar" "braceright" "asciitilde"
+nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil "dotlessi" "grave"
+"acute" "circumflex" "tilde" "macron" "cent" "ydieresis" "dieresis" nil "ring"
+"cedilla" nil "hungarumlaut" "twosuperior" "periodcentered" "nbspace" "Aogonek"
+"breve" "Lslash" "currency" "Lcaron" "Sacute" "section" "dieresis" "Scaron" "Scedilla"
+"Tcaron" "Zacute" "hyphen" "Zcaron" "Zdotaccent" "degree" "aogonek" "ogonek" "lslash"
+"acute" "lcaron" "sacute" "caron" "cedilla" "scaron" "scedilla" "tcaron" "zacute" "dblacute"
+"zcaron" "zdotaccent" "Racute" "Aacute" "Acircumflex" "Atilde" "Adieresis" "Lacute"
+"Cacute" "Ccedilla" "Ccaron" "Eacute" "Eogonek" "Edieresis" "Ecaron" "Iacute" "Icircumflex"
+"Dcaron" "Dbar" "Nacute" "Ncaron" "Oacute" "Ocircumflex" "Odblacute" "Odieresis"
+"multiply" "Rcaron" "Uring" "Uacute" "Udblacute" "Udieresis" "Yacute" "Tcedilla" "germandbls"
+"racute" "aacute" "acircumflex" "atilde" "adieresis" "lacute" "cacute" "ccedilla" "ccaron"
+"eacute" "eogonek" "edieresis" "ecaron" "iacute" "icircumflex" "dcaron" "dbar" "nacute"
+"ncaron" "oacute" "ocircumflex" "odblacute" "odieresis" "divide" "rcaron" "uring" "uacute"
+"udblacute" "udieresis" "yacute" "tcedilla" "dotaccent")))
+
+
+(defparameter *win-1250-encoding*
+  (make-instance 'pdf::custom-encoding 
+		 :name "Win1250Encoding"
+		 :keyword-name :win-1250-encoding
+		 :base-encoding :standard-encoding 
+		 :charset :1250
+		 :char-names #(
+nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil
+nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil "space"
+"exclam" "quotedbl" "numbersign" "dollar" "percent" "ampersand"
+"quotesingle" "parenleft" "parenright" "asterisk" "plus" "comma"
+"hyphen" "period" "slash" "zero" "one" "two" "three" "four"
+"five" "six" "seven" "eight" "nine" "colon" "semicolon" "less"
+"equal" "greater" "question" "at" "A" "B" "C" "D" "E" "F"
+"G" "H" "I" "J" "K" "L" "M" "N" "O" "P" "Q" "R" "S" "T"
+"U" "V" "W" "X" "Y" "Z" "bracketleft" "backslash"
+"bracketright" "asciicircum" "underscore" "grave" "a" "b" "c"
+"d" "e" "f" "g" "h" "i" "j" "k" "l" "m" "n" "o" "p" "q"
+"r" "s" "t" "u" "v" "w" "x" "y" "z" "braceleft" "bar"
+"braceright" "asciitilde" nil nil nil "quotesinglbase" nil
+"quotedblbase" "ellipsis" "dagger" "daggerdbl" nil "perthousand"
+"Scaron" "guilsinglleft" "Sacute" "Tcaron" "Zcaron" "Zacute" nil
+"quoteleft" "quoteright" "quotedblleft" "quotedblright" "bullet"
+"endash" "emdash" nil "trademark" "scaron" "guilsinglright"
+"sacute" "tcaron" "zcaron" "zacute" "space" "caron" "breve"
+"Lslash" "currency" "Aogonek" "brokenbar" "section" "dieresis"
+"copyright" "Scommaaccent" "guillemotleft" "logicalnot" "hyphen"
+"registered" "Zdotaccent" "degree" "plusminus" "ogonek" "lslash"
+"acute" "mu" "paragraph" "periodcentered" "cedilla" "aogonek"
+"scommaaccent" "guillemotright" "Lcaron" "hungarumlaut" "lcaron"
+"zdotaccent" "Racute" "Aacute" "Acircumflex" "Abreve"
+"Adieresis" "Lacute" "Cacute" "Ccedilla" "Ccaron" "Eacute"
+"Eogonek" "Edieresis" "Ecaron" "Iacute" "Icircumflex" "Dcaron"
+"Dcroat" "Nacute" "Ncaron" "Oacute" "Ocircumflex"
+"Ohungarumlaut" "Odieresis" "multiply" "Rcaron" "Uring" "Uacute"
+"Uhungarumlaut" "Udieresis" "Yacute" "Tcommaaccent" "germandbls"
+"racute" "aacute" "acircumflex" "abreve" "adieresis" "lacute"
+"cacute" "ccedilla" "ccaron" "eacute" "eogonek" "edieresis"
+"ecaron" "iacute" "icircumflex" "dcaron" "dcroat" "nacute"
+"ncaron" "oacute" "ocircumflex" "ohungarumlaut" "odieresis"
+"divide" "rcaron" "uring" "uacute" "uhungarumlaut" "udieresis"
+"yacute" "tcommaaccent" "dotaccent"
+)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Double-byte encodings
 
@@ -423,4 +503,5 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
   :standard-encoding t))
 
 (defparameter *unicode-encoding* (make-instance 'unicode-encoding))
+
 
