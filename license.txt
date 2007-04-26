@@ -5,6 +5,13 @@ http://www.fractalconcept.com/asp/html/cl-pdf.html
 
 Marc Battyani: marc.battyani@fractalconcept.com or marc@battyani.net
 
+Note that though this licence has no advertising clause anymore, it is
+recommenced that applications using cl-pdf/cl-typesetting, like Web servers,
+Web applications or native applications, insert somewhere (in the about or
+credits page for instance) "Document(s) generated with cl-pdf/cl-typesetting"
+This is not a licence requirement and is only asked as a way to to help 
+promote the Common Lisp language.
+
 cl-pdf is distributed under the following FreeBSD style license:
 
 /* ====================================================================
@@ -22,10 +29,6 @@ cl-pdf is distributed under the following FreeBSD style license:
  *    the documentation and/or other materials provided with the
  *    distribution.
  *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes cl-pdf for generating documents"
- * 
  * THIS SOFTWARE IS PROVIDED BY MARC BATTYANI ``AS IS'' AND ANY
  * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
