@@ -101,8 +101,15 @@
                                (let ((position (position 0 trns)))
                                  (when position (list position))))))))
               ((string= marker "IDAT")				; image data block
-               (setq data (make-array octet-length :element-type '(unsigned-byte 8)))
-               (read-sequence data stream))
+               (let ((start 0))
+                 (if (null data)
+                     (setf data (make-array octet-length
+                                            :element-type '(unsigned-byte 8)
+                                            :adjustable t))
+                     (progn
+                       (setf start (first (array-dimensions data)))
+                       (adjust-array data (+ start octet-length))))
+                 (read-sequence data stream :start start)))
               ((string= marker "IEND")
                (return))
               (t		;"pHYs"
@@ -148,4 +155,5 @@
                          ("/BitsPerComponent" . ,(bits-per-color png))
                          ("/Columns" . ,(width png)))
          :no-compression t)))				; data bits already come compressed
+
 
