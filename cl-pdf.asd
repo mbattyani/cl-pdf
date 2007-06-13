@@ -29,8 +29,6 @@
   (pushnew :uffi *features*)
   (print "UFFI loaded."))
 
-(load (merge-pathnames "iterate/iterate.asd" *load-truename*))
-
 #+use-salza-zlib
 (load (merge-pathnames "salza/salza.asd" *load-truename*))
 
