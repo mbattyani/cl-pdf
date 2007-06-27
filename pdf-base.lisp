@@ -66,27 +66,18 @@
         (write-line "Tj" *page-stream*))
       (format *page-stream* "(~a) Tj~%" text)))
 
-#+old-pdf-encoding
-(defun show-text (string) 
-  (write-cid-string string)
-  (write-line "Tj" *page-stream*))
-
 (defun draw-text (text)
   (if *font*
       (progn (write-to-page text (if *font* (encoding *font*)) t)
         (write-line "Tj" *page-stream*))
       (format *page-stream* "(~a) Tj~%" text)))
 
-#+old-pdf-encoding
-(defun draw-text (string) (show-text string))
-
 (defun show-text-on-next-line (string)
   (write-to-page string (if *font* (encoding *font*)))
   (write-line "'" *page-stream*))
 
-#+old-pdf-encoding
-(defun show-text-on-next-line (string)
-  (write-cid-string string)
+(defun draw-text-on-next-line (string)
+  (write-to-page string (if *font* (encoding *font*)) t)
   (write-line "'" *page-stream*))
 
 (defun show-spaced-strings (strings)
@@ -98,13 +89,13 @@
           (write-to-page item encoding))))
   (write-line "] TJ" *page-stream*))
 
-#+old-pdf-encoding
-(defun show-spaced-strings (strings)
+(defun draw-spaced-strings (strings)
   (write-string "[ " *page-stream*)
-  (dolist (item strings)
-    (if (numberp item)
-       (format *page-stream* "~a " item)
-       (write-cid-string item)))
+  (let ((encoding (if *font* (encoding *font*))))
+    (dolist (item strings)
+      (if (numberp item)
+          (format *page-stream* "~a " item)
+          (write-to-page item encoding t))))
   (write-line "] TJ" *page-stream*))
 
 
@@ -117,8 +108,10 @@
   (write-string ") " *page-stream*))
 
 (defmethod write-to-page ((string string) encoding &optional escape)
-   (declare (ignore encoding))
-   (if escape
+  ;; There is no point to interpret \n and others in a special way
+  ;; as they are not control characters within content stream
+  (declare (ignore encoding))
+  (if escape
       (loop for char across string
             do (case char
                  ((#\( #\) #\\)
@@ -171,15 +164,6 @@
  ;;; Deprecated in favor of show-text or draw-text
   (write-to-page char (if *font* (encoding *font*)) t)
   (write-line "Tj" *page-stream*))
-
-#+old-pdf-encoding
-(defun show-char (char)
-  (case char
-    (#\( (write-string "(\\() Tj " *page-stream*))
-    (#\) (write-string "(\\)) Tj " *page-stream*))
-    (#\\ (write-string "(\\\\) Tj " *page-stream*))
-    (t (write-cid-char char) (write-line "Tj" *page-stream*))))
-
 
 (defmethod write-to-page :before ((char character) encoding &optional escape)
   (declare (ignore escape encoding))

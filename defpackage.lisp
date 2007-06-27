@@ -23,7 +23,8 @@
    #:ascender #:descender #:char-metrics #:char-width #:font-metrics #:read-afm-file
    #:*document* #:*page* #:with-document #:with-page #:image #:add-images-to-page
    #:write-document #:set-font #:in-text-mode #:move-text #:draw-text #:show-text #:show-char
-   #:show-text-on-next-line #:show-spaced-strings
+   #:show-text-on-next-line #:draw-text-on-next-line
+   #:show-spaced-strings #:draw-spaced-strings
    #:set-text-rendering-mode #:set-char-spacing #:set-text-x-scale #:set-text-leading
    #:set-text-rise #:move-to-next-line #:set-text-matrix #:draw-and-adjust-string
    #:with-saved-state #:set-transform-matrix #:translate #:rotate #:scale #:skew #:rotate* #:skew*
