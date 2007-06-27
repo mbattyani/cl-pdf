@@ -78,22 +78,36 @@
    (subject :accessor subject :initarg :subject :initform nil)))
 
 (defmethod initialize-instance :after ((doc document)
-				       &key (creator "")
-				       empty author title subject keywords
-				       &allow-other-keys)
+				       &key empty mode layout
+				            (creator "") author title subject keywords
+                                       &allow-other-keys)
+ ;;; Args: empty  If true, do not set any slots
+  ;;       mode	  PageMode in catalog
+  ;;       layout PageLayout in catalog
   (unless empty
     (let ((*document* doc))
-      (setf (objects doc) (make-array 10 :fill-pointer 0 :adjustable t))
-      (setf (catalog doc) (make-instance 'indirect-object))
-      (setf (root-page doc) (make-instance 'page-node))
-      (setf (outline-root doc)(make-instance 'outline))
-      (setf (content (catalog doc))
-	    (make-instance 'dictionary
-			   :dict-values `(("/Type" . "/Catalog")
-					  ("/Pages" . ,(root-page doc)))))
+      (setf (objects doc) (make-array 10 :fill-pointer 0 :adjustable t)
+            (catalog doc) (make-instance 'indirect-object)
+            (root-page doc) (make-instance 'page-node)
+            (outline-root doc) (make-instance 'outline)
+            (content (catalog doc))
+	     (make-instance 'dictionary :dict-values
+              `(("/Type" . "/Catalog")
+                ("/Pages" . ,(root-page doc))
+                ,@(when layout `(("/PageLayout" . ,(case mode
+                                                     (:page    "/SinglePage")
+                                                     (:column  "/OneColumn")
+                                                     (:left    "/TwoColumnLeft")
+                                                     (:right   "/TwoColumnRight")
+                                                     (otherwise (pdf-name layout))))))
+                ,@(when mode `(("/PageMode" . ,(case mode
+                                                 (:none     "/UseNone")
+                                                 (:outlines "/UseOutlines")
+                                                 (:thumbs   "/UseThumbs")
+                                                 (:full     "/FullScreen")
+                                                 (otherwise (pdf-name mode)))))) )))
       (add-doc-info doc :creator creator :author author 
-		    :title title :subject subject :keywords keywords)
-     )))
+		    :title title :subject subject :keywords keywords) )))
 
 (defun add-doc-info (doc &key (creator "") author title subject keywords)
   (setf (docinfo doc) (make-instance 'indirect-object))
@@ -235,17 +249,6 @@
             else do (case char ((#\( #\) #\\)
                                 (write-char #\\ stream)))
                       (write-char char stream))
-      (write-char #\) stream))))
-
-#+old-pdf-encoding
-(defun pdf-string (obj)
- "Used to embrace a pdf string used in places other than content streams, e.g. annotations."
-  (let ((string (if (stringp obj) obj (princ-to-string obj))))
-    (with-output-to-string (stream nil #-cmu :element-type #-cmu (array-element-type string))
-      (write-char #\( stream)
-      (loop for char across string
-            do (case char ((#\( #\) #\\) (write-char #\\ stream)))
-               (write-char char stream))
       (write-char #\) stream))))
 
 (defmacro with-outline-level ((title ref-name) &body body)
@@ -455,10 +458,6 @@
         do (write-byte (ldb (byte 8 0) (char-code char)) *pdf-stream*))
   #-pdf-binary
   (write-sequence content *pdf-stream*))
-
-#+old-pdf-encoding
-(defmethod write-stream-content ((obj string))
-  (write-sequence obj *pdf-stream*))
 
 (defmethod write-stream-content ((obj sequence))
   #+pdf-binary
