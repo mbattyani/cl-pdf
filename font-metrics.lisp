@@ -362,15 +362,3 @@
 						    (and char (name char)))
 					(encoding-vector font-metrics))))))
 
-#+old-pdf-encoding
-(defun extract-font-metrics-encoding (font-metrics)
-  (let ((encoding (or (get-encoding (encoding-scheme font-metrics))
-		      (get-encoding (font-name font-metrics)))))
-    (if encoding
-	encoding
-	(make-instance 'encoding :name (font-name font-metrics)
-		       :standard-encoding nil
-		       :char-names (map 'vector #'(lambda (char)
-						    (and char (name char)))
-					(encoding-vector font-metrics))))))
-

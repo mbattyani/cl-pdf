@@ -121,11 +121,6 @@
   (let ((char-metrics (get-char-metrics char-or-code font (encoding font))))
     (if font-size (* (width char-metrics) font-size) (width char-metrics))))
 
-#+old-pdf-encoding
-(defun get-char-width (char-or-code font &optional font-size)
-  (let ((char (aref (characters font) (force-char-code char-or-code))))
-    (if font-size (* (width char) font-size) (width char))))
-
 (defun get-char-size (char-or-code font &optional font-size)
   (let* ((char-metrics (get-char-metrics char-or-code font (encoding font)))
 	 (width (width char-metrics))
@@ -136,30 +131,10 @@
 	(values (* width font-size)(* ascender font-size)(* descender font-size))
 	(values width ascender descender))))
 
-#+old-pdf-encoding
-(defun get-char-size (char-or-code font &optional font-size)
-  (let* ((char (aref (characters font) (force-char-code char-or-code)))
-	 (width (width char))
-	 (bbox (bbox char))
-	 (ascender (aref bbox 3))
-	 (descender (aref bbox 1)))
-    (if font-size
-	(values (* width font-size)(* ascender font-size)(* descender font-size))
-	(values width ascender descender))))
-
 (defun get-char-italic-correction (char-or-code font &optional font-size)
   (let* ((char-metrics (get-char-metrics char-or-code font (encoding font)))
 	 (left (left-italic-correction char-metrics))
 	 (right (right-italic-correction char-metrics)))
-    (if font-size
-	(values (* left font-size)(* right font-size))
-	(values left right))))
-
-#+old-pdf-encoding
-(defun get-char-italic-correction (char-or-code font &optional font-size)
-  (let* ((char (aref (characters font) (force-char-code char-or-code)))
-	 (left (left-italic-correction char))
-	 (right (right-italic-correction char)))
     (if font-size
 	(values (* left font-size)(* right font-size))
 	(values left right))))
@@ -179,12 +154,6 @@
          (kerning (gethash (+ (ash (code char-metrics1) 16) (code char-metrics2))
                            (kernings font)
                            0)))
-    (if font-size (* font-size kerning) kerning)))
-
-#+old-pdf-encoding
-(defun get-kerning (char1 char2 font &optional font-size)
-  (let ((kerning (gethash (+ (* (force-char-code char1) 65536)
-			     (force-char-code char2))(kernings font) 0)))
     (if font-size (* font-size kerning) kerning)))
 
 (defun get-font (&optional (name "helvetica") (encoding *default-encoding*))
