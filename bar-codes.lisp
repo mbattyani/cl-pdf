@@ -241,11 +241,11 @@
 ;; simply are too many border cases for this to make me feel right
 ;; about a totally automatic approach.
 
-(defun draw-bar-code128 (string x y &key (font (get-font)) (font-size 5) (start-stop-factor 0.3) (height 100) (width 400) (show-string t))
-    (let ((segs-per-char 11)
-	  (dispatch #'code128-b))
+(defun draw-bar-code128 (string x y &key (font (get-font)) (font-size 5) (start-stop-factor 0.3) (height 100) (width 400) (show-string t) (segs-per-char 11 segs-per-char-p))
+    (let ((dispatch #'code128-b))
       (when (and (evenp (length string))(every #'digit-char-p string))
-	(setf segs-per-char 5.5)
+	(unless segs-per-char-p
+          (setf segs-per-char 5.5))
 	(setf dispatch #'code128-c))
       (with-saved-state
 	  (translate x y)
