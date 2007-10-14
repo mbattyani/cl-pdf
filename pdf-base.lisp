@@ -21,29 +21,6 @@
 (defun set-gstate (&rest gstate)
   (format *page-stream* "~a gs~%" (name (apply #'add-gstate-to-page gstate))))
 
-(defun write-cid-string (string)
-  (write-char #\( *page-stream*)
-  (if (and *font* (typep (font-metrics *font*) 'ttu-font-metrics))
-      (loop for c across string do
-	   (let* ((code (char-code c))
-		  (hi (ldb (byte 8 8) code))
- 		  (lo (ldb (byte 8 0) code)))
- 	     (write-char (code-char hi) *page-stream*)
- 	     (write-char (code-char lo) *page-stream*)))
-      (princ string *page-stream*))
-  (write-string ") " *page-stream*))
-
-(defun write-cid-char (char)
-  (write-char #\( *page-stream*)
-  (if (and *font* (typep (font-metrics *font*) 'ttu-font-metrics))
-      (let* ((code (char-code char))
-             (hi (ldb (byte 8 8) code))
-             (lo (ldb (byte 8 0) code)))
-        (write-char (code-char hi) *page-stream*)
-        (write-char (code-char lo) *page-stream*))
-      (write-char char *page-stream*))
-  (write-string ") " *page-stream*))
-
 (defmacro def-pdf-op (name (&rest args) format)
   (if args
     `(defun ,name ,args (format *page-stream* ,format ,@args))
@@ -98,36 +75,22 @@
           (write-to-page item encoding t))))
   (write-line "] TJ" *page-stream*))
 
-
-(defmethod write-to-page :before ((string string) encoding &optional escape)
-  (declare (ignore escape encoding))
-  (write-char #\( *page-stream*))
-
-(defmethod write-to-page :after ((string string) encoding &optional escape)
-  (declare (ignore escape encoding))
-  (write-string ") " *page-stream*))
-
 (defmethod write-to-page ((string string) encoding &optional escape)
-  ;; There is no point to interpret \n and others in a special way
-  ;; as they are not control characters within content stream
   (declare (ignore encoding))
+  (write-char #\( *page-stream*)
   (if escape
       (loop for char across string
             do (case char
                  ((#\( #\) #\\)
                   (write-char #\\ *page-stream*)
                   (write-char char *page-stream*))
-                 ;(#\Newline
-                 ; (write-string "\\n" *page-stream*))
-                 ;(#\Return
-                 ; (write-string "\\r" *page-stream*))
-                 ;(#\Tab
-                 ; (write-string "\\t" *page-stream*))
                  (otherwise
                   (write-char char *page-stream*))))
-      (write-string string *page-stream*)))
+    (write-string string *page-stream*))
+  (write-string ") " *page-stream*))
 
 (defmethod write-to-page ((string string) (encoding custom-encoding) &optional escape)
+  (write-char #\( *page-stream*)
   (if (or escape #+lispworks (lw:text-string-p string) #+allegro t)	; may include unicode
       (loop with charset = (charset encoding)
             for char across string do
@@ -145,7 +108,8 @@
                                #-(or lispworks allegro) char
                                char)			; write-byte would be great
                            *page-stream*))))
-      (write-string string *page-stream*)))
+      (write-string string *page-stream*))
+  (write-string ") " *page-stream*))
 
 #+allegro
 (defun char-external-code (char charset)
@@ -153,10 +117,10 @@
 
 (defmethod write-to-page ((string string) (encoding unicode-encoding) &optional escape)
   (declare (ignore escape))
-  (loop for char across string
-        for code = (char-code char)
-        do (write-char (code-char (ldb (byte 8 8) code)) *page-stream*)
-           (write-char (code-char (ldb (byte 8 0) code)) *page-stream*)))
+  (write-char #\< *page-stream*)
+  (loop for char across string do
+        (format *page-stream* "~4,'0x" (char-code char)))
+  (write-string "> " *page-stream*))
 
 ;;; Single character output
 
@@ -165,21 +129,16 @@
   (write-to-page char (if *font* (encoding *font*)) t)
   (write-line "Tj" *page-stream*))
 
-(defmethod write-to-page :before ((char character) encoding &optional escape)
-  (declare (ignore escape encoding))
-  (write-char #\( *page-stream*))
-
-(defmethod write-to-page :after ((char character) encoding &optional escape)
-  (declare (ignore escape encoding))
-  (write-char #\) *page-stream*))
-
 (defmethod write-to-page ((char character) encoding &optional escape)
   (declare (ignore encoding))
+  (write-char #\( *page-stream*)
   (when escape (case char
                  ((#\( #\) #\\) (write-char #\\ *page-stream*))))
-  (write-char char *page-stream*))
+  (write-char char *page-stream*)
+  (write-char #\) *page-stream*))
 
 (defmethod write-to-page ((char character) (encoding custom-encoding) &optional escape)
+  (write-char #\( *page-stream*)
   (when escape (case char
                  ((#\( #\) #\\) (write-char #\\ *page-stream*))))
   (write-char (let ((charset (charset encoding)))
@@ -191,16 +150,13 @@
 		    #+allegro (code-char (char-external-code char charset))
                     #-(or lispworks allegro) char
                     char))
-              *page-stream*))
+              *page-stream*)
+  (write-char #\) *page-stream*))
 
 (defmethod write-to-page ((char character) (encoding unicode-encoding) &optional escape)
-  (when escape (case char
-                 ((#\( #\) #\\) ;(write-char #\Nnull *page-stream*) ?
-                  (write-char #\\ *page-stream*))))
-  (let ((code (char-code char)))
-    (write-char (code-char (ldb (byte 8 8) code)) *page-stream*)
-    (write-char (code-char (ldb (byte 8 0) code)) *page-stream*)))
-
+  (write-char #\< *page-stream*)
+  (format *page-stream* "~4,'0x" (char-code char))
+  (write-char #\> *page-stream*))
 
 (def-pdf-op set-text-rendering-mode (mode) "~d Tr~%")
 
