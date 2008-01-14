@@ -80,16 +80,31 @@
 
 
 (defgeneric get-char-metrics (char-or-code font encoding)
- ;;; This generic is intended to replace get-char.
+ ;;; This generic allows to customize treating charset by the lisp implementation
+  ;; and is intended to replace get-char.
   ;; Args: char-or-code  Lisp character or its char-code
-  ;; TODO: Customize your lisp implementation in treating charset.
-  ;; CAUTION: Don't use force-char-code from di-pdf.lisp!
  (:method (char-or-code font encoding)
    (declare (ignore encoding))
-  (aref (characters font) ;(force-char-code char-or-code)
+  (aref (characters font)
         (if (characterp char-or-code) (char-code char-or-code) char-or-code))))
 
-(defmethod get-char-metrics ((code integer) font (encoding custom-encoding))
+(defmethod get-char-metrics (char font (encoding single-byte-encoding))
+  (aref (characters font)
+        (if #+lispworks (lw:base-char-p char) 
+            #+allegro   (standard-char-p char)
+            #-(or lispworks allegro) t
+            (char-code char)
+            (char-external-code char (charset encoding)))))
+
+(defmethod get-char-metrics ((code integer) font (encoding single-byte-encoding))
+  (aref (characters font)
+        (if #+lispworks (lw:base-char-p char) 
+            #+allegro   (standard-char-p char)
+            #-(or lispworks allegro) t
+            code
+            (char-external-code (code-char code) (charset encoding)))))
+
+#|(defmethod get-char-metrics ((code integer) font (encoding custom-encoding))
   (aref (characters font)
         (let ((charset (charset encoding)))
           (if charset
@@ -106,12 +121,13 @@
               #+lispworks (ef:char-external-code char charset)
 	      #+allegro (char-external-code char charset)
               #-(or lispworks allegro) (char-code char)
-              (char-code char)))))
+              (char-code char)))))|#
 
-
+#+unused
 (defun get-char (code font)
   (aref (characters font) code))
 
+#+unused
 (defmacro force-char-code (char-or-code)
   (let ((char (gensym "char")))
     `(let ((,char ,char-or-code))

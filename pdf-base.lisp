@@ -89,8 +89,36 @@
     (write-string string *page-stream*))
   (write-string ") " *page-stream*))
 
-(defmethod write-to-page ((string string) (encoding custom-encoding) &optional escape)
+(defmethod write-to-page ((string string) (encoding single-byte-encoding) &optional escape)
+  ;; There is no point to interpret \n and others in a special way
+  ;; as they are not control characters within content stream
   (write-char #\( *page-stream*)
+  (if (or escape
+          #+lispworks (lw:text-string-p string)		; may include unicode
+          #+allegro t)
+      (loop with charset = (charset encoding)
+            for char across string
+            do (case char
+                 ((#\( #\) #\\)
+                  (write-char #\\ *page-stream*)
+                  (write-char char *page-stream*))
+                 ;(#\Newline
+                 ; (write-string "\\n" *page-stream*))
+                 ;(#\Return
+                 ; (write-string "\\r" *page-stream*))
+                 ;(#\Tab
+                 ; (write-string "\\t" *page-stream*))
+                 (otherwise
+                  (write-char (if #+lispworks (lw:base-char-p char)
+                                  #+allegro   (standard-char-p char)
+                                  #-(or lispworks allegro) t
+                                  char
+                                  (code-char (char-external-code char charset)))
+                              *page-stream*))))
+      (write-string string *page-stream*))
+  (write-string ") " *page-stream*))
+
+#|(defmethod write-to-page ((string string) (encoding custom-encoding) &optional escape)
   (if (or escape #+lispworks (lw:text-string-p string) #+allegro t)	; may include unicode
       (loop with charset = (charset encoding)
             for char across string do
@@ -108,12 +136,11 @@
                                #-(or lispworks allegro) char
                                char)			; write-byte would be great
                            *page-stream*))))
-      (write-string string *page-stream*))
-  (write-string ") " *page-stream*))
+      (write-string string *page-stream*)))
 
 #+allegro
 (defun char-external-code (char charset)
-  (aref (excl:string-to-octets (coerce `(,char) 'string) :external-format charset) 0))
+  (aref (excl:string-to-octets (coerce `(,char) 'string) :external-format charset) 0))|#
 
 (defmethod write-to-page ((string string) (encoding unicode-encoding) &optional escape)
   (declare (ignore escape))
@@ -130,6 +157,8 @@
   (write-line "Tj" *page-stream*))
 
 (defmethod write-to-page ((char character) encoding &optional escape)
+ ;;; This default method is only needed for deprecated and legacy code,
+  ;; e.g. bar-codes.lisp: draw-chars (*font* is nil) -> draw-char
   (declare (ignore encoding))
   (write-char #\( *page-stream*)
   (when escape (case char
@@ -137,8 +166,19 @@
   (write-char char *page-stream*)
   (write-char #\) *page-stream*))
 
-(defmethod write-to-page ((char character) (encoding custom-encoding) &optional escape)
+(defmethod write-to-page ((char character)(encoding single-byte-encoding) &optional escape)
   (write-char #\( *page-stream*)
+  (when escape (case char
+                 ((#\( #\) #\\) (write-char #\\ *page-stream*))))
+  (write-char (if #+lispworks (lw:base-char-p char)
+                  #+allegro   (standard-char-p char)
+                  #-(or lispworks allegro) t
+                  char
+                  (code-char (char-external-code char (charset encoding))))
+              *page-stream*)
+  (write-char #\) *page-stream*))
+
+#|(defmethod write-to-page ((char character) (encoding custom-encoding) &optional escape)
   (when escape (case char
                  ((#\( #\) #\\) (write-char #\\ *page-stream*))))
   (write-char (let ((charset (charset encoding)))
@@ -150,8 +190,7 @@
 		    #+allegro (code-char (char-external-code char charset))
                     #-(or lispworks allegro) char
                     char))
-              *page-stream*)
-  (write-char #\) *page-stream*))
+              *page-stream*))|#
 
 (defmethod write-to-page ((char character) (encoding unicode-encoding) &optional escape)
   (write-char #\< *page-stream*)

@@ -11,6 +11,7 @@
    #:*compress-streams* #:*zlib-search-paths* #:*zlib-loaded* #:load-zlib
    #:*max-number-of-pages* #:max-number-of-pages-reached
    #:*afm-files-directories* #:*default-encoding*
+   #:*char-single-byte-codes* #:*default-charset*
    #:*letter-portrait-page-bounds* #:*letter-landscape-page-bounds*
    #:*a4-portrait-page-bounds* #:*a4-landscape-page-bounds*
    #:*default-page-bounds*

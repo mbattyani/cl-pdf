@@ -502,6 +502,14 @@
 
 (defmethod write-object ((obj string) &optional root-level)
   (declare (ignorable root-level))
+  #+(and lispworks pdf-binary)
+  (if (lw:text-string-p obj)		; may include unicode characters
+      (loop for char across obj
+            if (lw:base-char-p char)
+            do (write-char char *pdf-stream*)
+            else do (write-byte (char-external-code char *default-charset*) *pdf-stream*))
+      (write-string obj *pdf-stream*))
+  #-(and lispworks pdf-binary)
   (write-string obj *pdf-stream*))
 
 (defmethod write-object ((obj symbol) &optional root-level)

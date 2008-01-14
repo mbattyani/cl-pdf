@@ -31,6 +31,7 @@
   (print-unreadable-object (self stream :identity t :type t)
     (format stream "~a" (name self))))
 
+;;; Single-byte encoding
 
 (defclass single-byte-encoding (encoding)
  ((char-names :accessor char-names :initform nil :initarg :char-names)
@@ -49,6 +50,25 @@
     (make-instance 'dictionary :dict-values
       `(("/Type" . "/Encoding")
 	("/Differences" . ,(compute-encoding-differences encoding nil))))))
+
+;; Charset is an atom or "extended charset" - an alist storing (char . code) pairs
+(defgeneric charset (encoding))
+
+(defmethod charset ((encoding single-byte-encoding))
+  (declare (ignorable encoding))
+  *char-single-byte-codes*)
+
+(defun char-external-code (char charset)
+  (cond ((null charset)
+         (char-code char))
+        ((atom charset)
+         #+lispworks (ef:char-external-code char charset)
+         #+allegro   (aref (excl:string-to-octets (coerce `(,char) 'string)
+                                                  :external-format charset)
+                           0)
+         #-(or lispworks allegro)  (char-code char))
+        ((cdr (assoc char charset)))		; map to single-byte if possible
+        (t (char-code char))))
 
 ;;; Built-in encoding instances
 

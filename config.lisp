@@ -18,6 +18,17 @@
 #+clisp
 (setf *default-file-encoding*  (ext:make-encoding :charset charset:iso-8859-1))
 
+;; Map exceptional but useful characters to the [0-255] range for a single-byte encoding
+;; Add more here...
+(defparameter *char-single-byte-codes*
+  '((#.(code-char #x2014) . #x97)))			; Em dash: 3212 -> 151
+
+;; Charset for strings mentioned outside content streams, e.g. in outlines.
+;; See #<method write-object (string &optional root-level)>
+(defvar *default-charset*
+  #+(and lispworks win32) (ef::ef-coded-character-set win32:*multibyte-code-page-ef*)
+  #-(and lispworks win32) *char-single-byte-codes*)	; last resort
+
 (defvar *min-size-for-compression* 300)
 
 (defvar *compress-streams* nil
