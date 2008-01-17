@@ -97,12 +97,13 @@
             (char-external-code char (charset encoding)))))
 
 (defmethod get-char-metrics ((code integer) font (encoding single-byte-encoding))
+  (let ((char (code-char code)))
   (aref (characters font)
         (if #+lispworks (lw:base-char-p char) 
             #+allegro   (standard-char-p char)
             #-(or lispworks allegro) t
             code
-            (char-external-code (code-char code) (charset encoding)))))
+              (char-external-code char (charset encoding))))))
 
 #|(defmethod get-char-metrics ((code integer) font (encoding custom-encoding))
   (aref (characters font)
