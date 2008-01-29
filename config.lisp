@@ -21,7 +21,14 @@
 ;; Map exceptional but useful characters to the [0-255] range for a single-byte encoding
 ;; Add more here...
 (defparameter *char-single-byte-codes*
-  '((#.(code-char #x2014) . #x97)))			; Em dash: 3212 -> 151
+ '((#.(code-char #x2013) . #x96)	; En dash: 8211 -> 150
+   (#.(code-char #x2014) . #x97)	; Em dash: 8212 -> 151
+   (#.(code-char #x2022) . #xB7)	; Bullet: 8226 -> 183
+   (#.(code-char #x2026) . #x85)	; Ellipsis: 8230 -> 133
+   (#.(code-char #x2039) . #x8B)	; Single left angle quotation mark: 8249 -> 139
+   (#.(code-char #x203A) . #x9B)	; Single right angle quotation mark: 8250 -> 155
+   (#.(code-char #x2122) . #x99)	; Trademark: 8482 -> 153
+) )
 
 ;; Charset for strings mentioned outside content streams, e.g. in outlines.
 ;; See #<method write-object (string &optional root-level)>
