@@ -439,7 +439,8 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
 		 :name "Latin2Encoding"
 		 :keyword-name :latin-2-encoding
 		 :base-encoding :standard-encoding 
-		 :charset :latin-2
+		 :charset #-sbcl :latin-2
+                          #+sbcl *sbcl-latin-2-charset*
 		 :char-names #( nil nil nil nil nil nil nil nil
 nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil nil
 nil nil nil nil nil nil nil nil
