@@ -91,8 +91,8 @@
 (defmethod get-char-metrics (char font (encoding single-byte-encoding))
   (aref (characters font)
         (if #+lispworks (lw:base-char-p char) 
-            #+allegro   (standard-char-p char)
-            #-(or lispworks allegro) t
+            #+(or allegro sbcl) (standard-char-p char)
+            #-(or lispworks allegro sbcl) t
             (char-code char)
             (char-external-code char (charset encoding)))))
 
@@ -100,29 +100,10 @@
   (let ((char (code-char code)))
   (aref (characters font)
         (if #+lispworks (lw:base-char-p char) 
-            #+allegro   (standard-char-p char)
-            #-(or lispworks allegro) t
+              #+(or allegro sbcl) (standard-char-p char)
+              #-(or lispworks allegro sbcl) t
             code
               (char-external-code char (charset encoding))))))
-
-#|(defmethod get-char-metrics ((code integer) font (encoding custom-encoding))
-  (aref (characters font)
-        (let ((charset (charset encoding)))
-          (if charset
-              #+lispworks (ef:char-external-code (code-char code) charset)
-	      #+allegro (char-external-code (code-char code) charset)
-              #-(or lispworks allegro) code
-              code))))
-
-(defmethod get-char-metrics ((char character) font (encoding custom-encoding))
- ;;; Map Unicode char code to code belonging [0-255] range.
-  (aref (characters font)
-        (let ((charset (charset encoding)))
-          (if charset
-              #+lispworks (ef:char-external-code char charset)
-	      #+allegro (char-external-code char charset)
-              #-(or lispworks allegro) (char-code char)
-              (char-code char)))))|#
 
 #+unused
 (defun get-char (code font)
