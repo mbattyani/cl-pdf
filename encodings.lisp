@@ -433,6 +433,107 @@ nil nil nil nil nil nil "a101" "a102" "a103" "a104" "a106" "a107"
         "checyrillic" "shacyrillic" "shchacyrillic" "hardsigncyrillic" "yericyrillic"
         "softsigncyrillic" "ereversedcyrillic" "iucyrillic" "iacyrillic")))
 
+;;; As SBCL lacks charset-specific conversion, map exceptional characters
+;;; of Latin-2 as if it were a single-byte encoding.
+#+sbcl
+(defparameter *sbcl-latin-2-charset*
+ '((#.(code-char #x00A0) . #xA0) ; NO-BREAK_SPACE
+   (#.(code-char #x0104) . #xA1) ; LATIN_CAPITAL_LETTER_A_WITH_OGONEK
+   (#.(code-char #x02D8) . #xA2) ; BREVE
+   (#.(code-char #x0141) . #xA3) ; LATIN_CAPITAL_LETTER_L_WITH_STROKE
+   (#.(code-char #x00A4) . #xA4) ; CURRENCY_SIGN
+   (#.(code-char #x013D) . #xA5) ; LATIN_CAPITAL_LETTER_L_WITH_CARON
+   (#.(code-char #x015A) . #xA6) ; LATIN_CAPITAL_LETTER_S_WITH_ACUTE
+   (#.(code-char #x00A7) . #xA7) ; SECTION_SIGN
+   (#.(code-char #x00A8) . #xA8) ; DIAERESIS
+   (#.(code-char #x0160) . #xA9) ; LATIN_CAPITAL_LETTER_S_WITH_CARON
+   (#.(code-char #x015E) . #xAA) ; LATIN_CAPITAL_LETTER_S_WITH_CEDILLA
+   (#.(code-char #x0164) . #xAB) ; LATIN_CAPITAL_LETTER_T_WITH_CARON
+   (#.(code-char #x0179) . #xAC) ; LATIN_CAPITAL_LETTER_Z_WITH_ACUTE
+   (#.(code-char #x00AD) . #xAD) ; SOFT_HYPHEN
+   (#.(code-char #x017D) . #xAE) ; LATIN_CAPITAL_LETTER_Z_WITH_CARON
+   (#.(code-char #x017B) . #xAF) ; LATIN_CAPITAL_LETTER_Z_WITH_DOT_ABOVE
+   (#.(code-char #x00B0) . #xB0) ; DEGREE_SIGN
+   (#.(code-char #x0105) . #xB1) ; LATIN_SMALL_LETTER_A_WITH_OGONEK
+   (#.(code-char #x02DB) . #xB2) ; OGONEK
+   (#.(code-char #x0142) . #xB3) ; LATIN_SMALL_LETTER_L_WITH_STROKE
+   (#.(code-char #x00B4) . #xB4) ; ACUTE_ACCENT
+   (#.(code-char #x013E) . #xB5) ; LATIN_SMALL_LETTER_L_WITH_CARON
+   (#.(code-char #x015B) . #xB6) ; LATIN_SMALL_LETTER_S_WITH_ACUTE
+   (#.(code-char #x02C7) . #xB7) ; CARON
+   (#.(code-char #x00B8) . #xB8) ; CEDILLA
+   (#.(code-char #x0161) . #xB9) ; LATIN_SMALL_LETTER_S_WITH_CARON
+   (#.(code-char #x015F) . #xBA) ; LATIN_SMALL_LETTER_S_WITH_CEDILLA
+   (#.(code-char #x0165) . #xBB) ; LATIN_SMALL_LETTER_T_WITH_CARON
+   (#.(code-char #x017A) . #xBC) ; LATIN_SMALL_LETTER_Z_WITH_ACUTE
+   (#.(code-char #x02DD) . #xBD) ; DOUBLE_ACUTE_ACCENT
+   (#.(code-char #x017E) . #xBE) ; LATIN_SMALL_LETTER_Z_WITH_CARON
+   (#.(code-char #x017C) . #xBF) ; LATIN_SMALL_LETTER_Z_WITH_DOT_ABOVE
+   (#.(code-char #x0154) . #xC0) ; LATIN_CAPITAL_LETTER_R_WITH_ACUTE
+   (#.(code-char #x00C1) . #xC1) ; LATIN_CAPITAL_LETTER_A_WITH_ACUTE
+   (#.(code-char #x00C2) . #xC2) ; LATIN_CAPITAL_LETTER_A_WITH_CIRCUMFLEX
+   (#.(code-char #x0102) . #xC3) ; LATIN_CAPITAL_LETTER_A_WITH_BREVE
+   (#.(code-char #x00C4) . #xC4) ; LATIN_CAPITAL_LETTER_A_WITH_DIAERESIS
+   (#.(code-char #x0139) . #xC5) ; LATIN_CAPITAL_LETTER_L_WITH_ACUTE
+   (#.(code-char #x0106) . #xC6) ; LATIN_CAPITAL_LETTER_C_WITH_ACUTE
+   (#.(code-char #x00C7) . #xC7) ; LATIN_CAPITAL_LETTER_C_WITH_CEDILLA
+   (#.(code-char #x010C) . #xC8) ; LATIN_CAPITAL_LETTER_C_WITH_CARON
+   (#.(code-char #x00C9) . #xC9) ; LATIN_CAPITAL_LETTER_E_WITH_ACUTE
+   (#.(code-char #x0118) . #xCA) ; LATIN_CAPITAL_LETTER_E_WITH_OGONEK
+   (#.(code-char #x00CB) . #xCB) ; LATIN_CAPITAL_LETTER_E_WITH_DIAERESIS
+   (#.(code-char #x011A) . #xCC) ; LATIN_CAPITAL_LETTER_E_WITH_CARON
+   (#.(code-char #x00CD) . #xCD) ; LATIN_CAPITAL_LETTER_I_WITH_ACUTE
+   (#.(code-char #x00CE) . #xCE) ; LATIN_CAPITAL_LETTER_I_WITH_CIRCUMFLEX
+   (#.(code-char #x010E) . #xCF) ; LATIN_CAPITAL_LETTER_D_WITH_CARON
+   (#.(code-char #x0110) . #xD0) ; LATIN_CAPITAL_LETTER_D_WITH_STROKE
+   (#.(code-char #x0143) . #xD1) ; LATIN_CAPITAL_LETTER_N_WITH_ACUTE
+   (#.(code-char #x0147) . #xD2) ; LATIN_CAPITAL_LETTER_N_WITH_CARON
+   (#.(code-char #x00D3) . #xD3) ; LATIN_CAPITAL_LETTER_O_WITH_ACUTE
+   (#.(code-char #x00D4) . #xD4) ; LATIN_CAPITAL_LETTER_O_WITH_CIRCUMFLEX
+   (#.(code-char #x0150) . #xD5) ; LATIN_CAPITAL_LETTER_O_WITH_DOUBLE_ACUTE
+   (#.(code-char #x00D6) . #xD6) ; LATIN_CAPITAL_LETTER_O_WITH_DIAERESIS
+   (#.(code-char #x00D7) . #xD7) ; MULTIPLICATION_SIGN
+   (#.(code-char #x0158) . #xD8) ; LATIN_CAPITAL_LETTER_R_WITH_CARON
+   (#.(code-char #x016E) . #xD9) ; LATIN_CAPITAL_LETTER_U_WITH_RING_ABOVE
+   (#.(code-char #x00DA) . #xDA) ; LATIN_CAPITAL_LETTER_U_WITH_ACUTE
+   (#.(code-char #x0170) . #xDB) ; LATIN_CAPITAL_LETTER_U_WITH_DOUBLE_ACUTE
+   (#.(code-char #x00DC) . #xDC) ; LATIN_CAPITAL_LETTER_U_WITH_DIAERESIS
+   (#.(code-char #x00DD) . #xDD) ; LATIN_CAPITAL_LETTER_Y_WITH_ACUTE
+   (#.(code-char #x0162) . #xDE) ; LATIN_CAPITAL_LETTER_T_WITH_CEDILLA
+   (#.(code-char #x00DF) . #xDF) ; LATIN_SMALL_LETTER_SHARP_S
+   (#.(code-char #x0155) . #xE0) ; LATIN_SMALL_LETTER_R_WITH_ACUTE
+   (#.(code-char #x00E1) . #xE1) ; LATIN_SMALL_LETTER_A_WITH_ACUTE
+   (#.(code-char #x00E2) . #xE2) ; LATIN_SMALL_LETTER_A_WITH_CIRCUMFLEX
+   (#.(code-char #x0103) . #xE3) ; LATIN_SMALL_LETTER_A_WITH_BREVE
+   (#.(code-char #x00E4) . #xE4) ; LATIN_SMALL_LETTER_A_WITH_DIAERESIS
+   (#.(code-char #x013A) . #xE5) ; LATIN_SMALL_LETTER_L_WITH_ACUTE
+   (#.(code-char #x0107) . #xE6) ; LATIN_SMALL_LETTER_C_WITH_ACUTE
+   (#.(code-char #x00E7) . #xE7) ; LATIN_SMALL_LETTER_C_WITH_CEDILLA
+   (#.(code-char #x010D) . #xE8) ; LATIN_SMALL_LETTER_C_WITH_CARON
+   (#.(code-char #x00E9) . #xE9) ; LATIN_SMALL_LETTER_E_WITH_ACUTE
+   (#.(code-char #x0119) . #xEA) ; LATIN_SMALL_LETTER_E_WITH_OGONEK
+   (#.(code-char #x00EB) . #xEB) ; LATIN_SMALL_LETTER_E_WITH_DIAERESIS
+   (#.(code-char #x011B) . #xEC) ; LATIN_SMALL_LETTER_E_WITH_CARON
+   (#.(code-char #x00ED) . #xED) ; LATIN_SMALL_LETTER_I_WITH_ACUTE
+   (#.(code-char #x00EE) . #xEE) ; LATIN_SMALL_LETTER_I_WITH_CIRCUMFLEX
+   (#.(code-char #x010F) . #xEF) ; LATIN_SMALL_LETTER_D_WITH_CARON
+   (#.(code-char #x0111) . #xF0) ; LATIN_SMALL_LETTER_D_WITH_STROKE
+   (#.(code-char #x0144) . #xF1) ; LATIN_SMALL_LETTER_N_WITH_ACUTE
+   (#.(code-char #x0148) . #xF2) ; LATIN_SMALL_LETTER_N_WITH_CARON
+   (#.(code-char #x00F3) . #xF3) ; LATIN_SMALL_LETTER_O_WITH_ACUTE
+   (#.(code-char #x00F4) . #xF4) ; LATIN_SMALL_LETTER_O_WITH_CIRCUMFLEX
+   (#.(code-char #x0151) . #xF5) ; LATIN_SMALL_LETTER_O_WITH_DOUBLE_ACUTE
+   (#.(code-char #x00F6) . #xF6) ; LATIN_SMALL_LETTER_O_WITH_DIAERESIS
+   (#.(code-char #x00F7) . #xF7) ; DIVISION_SIGN
+   (#.(code-char #x0159) . #xF8) ; LATIN_SMALL_LETTER_R_WITH_CARON
+   (#.(code-char #x016F) . #xF9) ; LATIN_SMALL_LETTER_U_WITH_RING_ABOVE
+   (#.(code-char #x00FA) . #xFA) ; LATIN_SMALL_LETTER_U_WITH_ACUTE
+   (#.(code-char #x0171) . #xFB) ; LATIN_SMALL_LETTER_U_WITH_DOUBLE_ACUTE
+   (#.(code-char #x00FC) . #xFC) ; LATIN_SMALL_LETTER_U_WITH_DIAERESIS
+   (#.(code-char #x00FD) . #xFD) ; LATIN_SMALL_LETTER_Y_WITH_ACUTE
+   (#.(code-char #x0163) . #xFE) ; LATIN_SMALL_LETTER_T_WITH_CEDILLA
+   (#.(code-char #x02D9) . #xFF) ; DOT_ABOVE
+) )
 
 (defparameter *latin-2-encoding*
   (make-instance 'pdf::custom-encoding 

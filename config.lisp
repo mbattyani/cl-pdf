@@ -30,7 +30,7 @@
    (#.(code-char #x2122) . #x99)	; Trademark: 8482 -> 153
 ) )
 
-;; As SBCL lacks charset-specific conversion, map exceptional characters
+#|;; As SBCL lacks charset-specific conversion, map exceptional characters
 ;; of Latin-2 as if it were a single-byte encoding.
 ;; TODO Only Hungarian characters are included at the moment.
 #+sbcl
@@ -39,7 +39,7 @@
          '(#.(code-char #x0151) . #xF5) ; LATIN_SMALL_LETTER_O_WITH_DOUBLE_ACUTE
          '(#.(code-char #x0170) . #xDB) ; LATIN_CAPITAL_LETTER_U_WITH_DOUBLE_ACUTE
          '(#.(code-char #x0171) . #xFB) ; LATIN_SMALL_LETTER_U_WITH_DOUBLE_ACUTE
-         *char-single-byte-codes*))
+         *char-single-byte-codes*))|#
 
 ;; Charset for strings mentioned outside content streams, e.g. in outlines.
 ;; See #<method write-object (string &optional root-level)>
