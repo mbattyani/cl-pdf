@@ -70,7 +70,7 @@ next octet to DEFLATE-STREAM."
            (type buffer-offset start end)
            (optimize (speed 3) (safety 0)))
   #+(and sbcl (not octet-characters))
-  (sb-ext:string-to-octets string :start start :end end)
+  (sb-ext:string-to-octets string :external-format :iso-8859-1 :start start :end end)
   #+(and allegro (not octet-characters))
   (excl:string-to-octets string :start start :end end :null-terminate nil)
   #+(and clisp (not octet-characters))
