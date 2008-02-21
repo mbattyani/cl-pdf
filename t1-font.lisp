@@ -74,7 +74,7 @@
               `(("/FontFile" . ,(make-instance 'indirect-object :content
                                   (make-instance 'pdf-stream
                                     :content (binary-data t1fm)
-                                    :no-compression t ;(not *compress-fonts*)
+                                    :no-compression (not *compress-fonts*)
                                     :dict-values `(;("/Type" . "/Pages") ;remove!
                                                    ("/Length1" . ,(length1 t1fm))
                                                    ("/Length2" . ,(length2 t1fm))

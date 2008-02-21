@@ -67,7 +67,7 @@
 		   (make-instance
 		    'pdf-stream
 		    :content (binary-data fm)
-		    :no-compression t
+		    :no-compression (not *compress-fonts*)
 		    :dict-values `(("/Length1" . ,(length1 fm)))))))))))))
 
 (defclass cid-font ()
@@ -99,7 +99,7 @@
 	  (make-instance
 	   'pdf-stream
 	   :content (c2g font)
-	   :no-compression t))))))
+	   :no-compression (not *compress-fonts*)))))))
 
 (defmethod make-dictionary ((fm ttu-font-metrics)
                             &key font (encoding (encoding font)) (embed *embed-fonts*))
