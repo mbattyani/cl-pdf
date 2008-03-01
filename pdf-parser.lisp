@@ -493,7 +493,8 @@ Returns the first unused object-number."
 (defmacro with-existing-document ((file &key (creator "") author title subject keywords) &body body)
   `(let* ((*document* (read-pdf-file ,file))
 	  (*root-page* (root-page *document*))
-	  (*page-number* 0))
+	  (*page-number* 0)
+          (*name-counter* 100))
      (add-doc-info *document* :creator ,creator :author ,author
 		   :title ,title :subject ,subject :keywords ,keywords)
     ,@body))
