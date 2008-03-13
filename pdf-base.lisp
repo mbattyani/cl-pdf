@@ -351,30 +351,36 @@
 (defclass jpeg-image (bitmap-image)
   ())
 
-(defun %read-jpeg-file% (filename)
+(defun %read-jpeg-file% (filename &key header-only)
   (with-open-file (s filename :direction :input :element-type '(unsigned-byte 8))
     (loop with width and height and nb-components and data
 	  for marker = (read-byte s)
-	  if (= marker #xFF) do
-	      (setf marker (read-byte s))
+	  when (= marker #xFF)
+          do (setf marker (read-byte s))
 	      (cond
-		((member marker '(#xC0 #xC1 #xC2));SOF markers
+              ((member marker '(#xC0 #xC1 #xC2))
+               ;; SOF markers
 		 (read-byte s)(read-byte s) ;size
-		 (when (/= (read-byte s) 8) (error "JPEG must have 8bits per component"))
-		 (setf height (+ (ash (read-byte s) 8)(read-byte s)))
-		 (setf width (+ (ash (read-byte s) 8)(read-byte s)))
-		 (setf nb-components (read-byte s))
+               (when (/= (read-byte s) 8)
+                 (error "JPEG must have 8bits per component"))
+               (setf height (+ (ash (read-byte s) 8) (read-byte s))
+                     width (+ (ash (read-byte s) 8) (read-byte s))
+                     nb-components (read-byte s))
+               (unless header-only
 		 (file-position s :start)
 		 (setf data (make-array (file-length s) :element-type '(unsigned-byte 8)))
-		 (read-sequence data s)
+                 (read-sequence data s))
 		 (return (values nb-components width height data)))
-		((member marker '(#xC3 #xC5 #xC6 #xC7 #xC8 #xC9 #xCA #xCB #xCD #xCE #xCF)) ;unsupported markers
+              ((member marker '(#xC3 #xC5 #xC6 #xC7 #xC8 #xC9 #xCA #xCB #xCD #xCE #xCF))
+               ;; unsupported markers
 		 (error "Unsupported JPEG format"))
-		((not (member marker '(#xD0 #xD1 #xD2 #xD3 #xD4 #xD5 #xD6 #xD7 #xD8 #x01))) ;no param markers
+              ((not (member marker '(#xD0 #xD1 #xD2 #xD3 #xD4 #xD5 #xD6 #xD7 #xD8 #x01)))
+               ;; no param markers
 		 (file-position s (+ (file-position s)(ash (read-byte s) 8)(read-byte s) -2)))))))
 
-(defun read-jpeg-file (filename)
-  (multiple-value-bind (nb-components width height data) (%read-jpeg-file% filename)
+(defun read-jpeg-file (filename &key header-only)
+  (multiple-value-bind (nb-components width height data)
+      (%read-jpeg-file% filename :header-only header-only)
     (when nb-components
       (make-instance 'jpeg-image :nb-components nb-components
 		     :width width :height height :data data))))

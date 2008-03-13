@@ -43,7 +43,7 @@
   (palette :accessor palette :initarg :palette)
   (mask :accessor mask :initarg :mask)))
 
-(defun read-png-file (pathname)
+(defun read-png-file (pathname &key header-only)
   (with-open-file (stream pathname :direction :input :element-type '(unsigned-byte 8))
    (flet ((skip-octets (octet-length)
             (dotimes (i octet-length) (read-byte stream))
@@ -101,15 +101,17 @@
                                (let ((position (position 0 trns)))
                                  (when position (list position))))))))
               ((string= marker "IDAT")				; image data block
-               (let ((start 0))
-                 (if (null data)
-                     (setf data (make-array octet-length
-                                            :element-type '(unsigned-byte 8)
-                                            :adjustable t))
-                     (progn
-                       (setf start (first (array-dimensions data)))
-                       (adjust-array data (+ start octet-length))))
-                 (read-sequence data stream :start start)))
+               (if header-only
+                   (skip-octets octet-length)
+                   (let ((start 0))
+                     (if (null data)
+                         (setf data (make-array octet-length
+                                                :element-type '(unsigned-byte 8)
+                                                :adjustable t))
+                         (progn
+                           (setf start (first (array-dimensions data)))
+                           (adjust-array data (+ start octet-length))))
+                     (read-sequence data stream :start start))))
               ((string= marker "IEND")
                (return))
               (t		;"pHYs"
