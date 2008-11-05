@@ -376,7 +376,7 @@
 		 (error "Unsupported JPEG format"))
               ((not (member marker '(#xD0 #xD1 #xD2 #xD3 #xD4 #xD5 #xD6 #xD7 #xD8 #x01)))
                ;; no param markers
-		 (file-position s (+ (file-position s)(ash (read-byte s) 8)(read-byte s) -2)))))))
+		 (file-position s (+ (file-position s) (ash (read-byte s) 8) (read-byte s))))))))
 
 (defun read-jpeg-file (filename &key header-only)
   (multiple-value-bind (nb-components width height data)

@@ -12,7 +12,7 @@
 
 (defclass ttu-font-metrics (font-metrics)
   ((c2g :accessor c2g
-	:initform (make-array 131072 :element-type 'character :initial-element #\Nul))
+	:initform (make-array 131072 :element-type 'character :initial-element #\Null))
    (cid-widths :accessor cid-widths :initform (make-array 0 :adjustable t :fill-pointer 0))
    (pdf-widths :accessor pdf-widths :initform nil)
    (binary-data :accessor binary-data :initform nil)
