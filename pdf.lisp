@@ -94,7 +94,7 @@
 	     (make-instance 'dictionary :dict-values
               `(("/Type" . "/Catalog")
                 ("/Pages" . ,(root-page doc))
-                ,@(when layout `(("/PageLayout" . ,(case mode
+                ,@(when layout `(("/PageLayout" . ,(case layout
                                                      (:page    "/SinglePage")
                                                      (:column  "/OneColumn")
                                                      (:left    "/TwoColumnLeft")
