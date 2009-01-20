@@ -17,7 +17,8 @@
    #:*default-page-bounds*
    #:load-fonts #:get-font #:font #:clear-font-cache #:name #:encoding #:font-metrics #:add-font-to-page
    #:font-name #:full-name #:family-name #:weight #:font-bbox #:*version* #:notice #:encoding-scheme
-   #:characters #:code #:width #:bbox #:kernings #:get-char #:get-char-width #:get-char-size
+   #:characters #:code #:width #:bbox #:kernings #:get-font-descender
+   #:get-char #:get-char-width #:get-char-size
    #:get-kerning #:hyphen-char #:mapping-scheme
    #:get-char-italic-correction #:get-font-italic-correction
    #:esc-char #:character-set #:base-font-p #:vvector #:fixed-v-p #:cap-height #:x-height
