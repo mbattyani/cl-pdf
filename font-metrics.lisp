@@ -1,4 +1,4 @@
-;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2009 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -7,6 +7,10 @@
 ;;Many thanks to Alexey Dejneka (adejneka@comail.ru) who finished the parsing of the AFM files.
 
 (defvar *font-metrics* (make-hash-table :test #'equal))
+
+(defgeneric font-descriptor (font-metrics &key embed errorp))
+
+(defgeneric font-type (font-metrics))
 
 (defclass char-metrics ()
   ((code  :accessor code  :initarg :code)
@@ -331,6 +335,8 @@
   (if errorp
       (error "Generic fonts do not have descriptors.")
       nil))
+
+(defgeneric make-dictionary (thing &key &allow-other-keys))
 
 (defmethod make-dictionary ((fm font-metrics)
                             &key font (encoding (encoding font)) (embed *embed-fonts*)

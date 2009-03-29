@@ -1,4 +1,4 @@
-;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2009 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -384,6 +384,8 @@
     (when nb-components
       (make-instance 'jpeg-image :nb-components nb-components
 		     :width width :height height :data data))))
+
+(defgeneric make-jpeg-image (jpeg))
 
 (defmethod make-jpeg-image (jpeg)
   (make-image jpeg))

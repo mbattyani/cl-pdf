@@ -1,4 +1,4 @@
-;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2009 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -11,8 +11,6 @@
   "The current font in text mode")
 
 (defvar *font-cache* (make-hash-table :test #'equal))
-
-(defgeneric font-descriptor (font-metrics &key embed errorp))
 
 (defclass font ()
  ((name :accessor name :initform "helvetica" :initarg :name)

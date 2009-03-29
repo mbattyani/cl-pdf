@@ -1,6 +1,6 @@
 ;;;; -*- Mode: LISP; Syntax: ANSI-Common-Lisp; Base: 10 -*-
 
-;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2009 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -13,13 +13,14 @@
 
 ;;;Choose the zlib implementation you want to use (only one!)
 (eval-when (:load-toplevel :compile-toplevel :execute)
-  (pushnew :use-salza-zlib *features*)
+  ;;(pushnew :use-salza2-zlib *features*)
+  ;;(pushnew :use-salza-zlib *features*)
   ;;(pushnew :use-uffi-zlib *features*)
   ;;(pushnew :use-abcl-zlib *features*)
-  ;;(pushnew :use-no-zlib *features*)
+  (pushnew :use-no-zlib *features*)
   )
 
-#-(or use-uffi-zlib use-salza-zlib use-abcl-zlib use-no-zlib)
+#-(or use-uffi-zlib use-salza-zlib use-salza2-zlib use-abcl-zlib use-no-zlib)
 (error "You must choose which zlib implementation you want to use!")
 
 #+(and (not uffi) use-uffi-zlib)
@@ -63,4 +64,4 @@
 	       (:file "text" :depends-on ("pdf-base"))
 	       (:file "bar-codes" :depends-on ("pdf-geom"))
 	       (:file "chart" :depends-on ("text" "pdf-geom")))
-  :depends-on (:iterate #+use-salza-zlib :salza))
+  :depends-on (:iterate #+use-salza-zlib :salza #+use-salza2-zlib :salza2))

@@ -1,4 +1,4 @@
-;;; cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
+;;; cl-pdf copyright 2002-2009 Marc Battyani see license.txt for the details
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
@@ -20,8 +20,6 @@
 
 (defun gen-name (prefix)
   (format nil "~a~d" prefix (incf *name-counter*)))
-
-(defgeneric make-dictionary (thing &key &allow-other-keys))
 
 (defclass dictionary ()
   ((dict-values :accessor dict-values :initform nil :initarg :dict-values)))
@@ -434,6 +432,8 @@
 		       :dict-values `(("/Type" . "/Annot")("/Subtype" . "/Text")
 				      ("/Rect" . ,rect)("/Contents" . ,text)))))
 
+(defgeneric write-object (obj &optional root-level))
+
 (defmethod write-object ((obj null) &optional root-level)
   (declare (ignorable root-level))
   (write-string "null" *pdf-stream*))
@@ -448,6 +448,8 @@
 	(write-object val)
 	(write-char #\Newline *pdf-stream*))
   (write-line " >>" *pdf-stream*))
+
+(defgeneric write-stream-content (content))
 
 (defmethod write-stream-content ((content string))
   ;; Args: content Base string, may include
@@ -542,6 +544,8 @@
 (defmethod write-object ((obj named-reference) &optional root-level)
   (declare (ignorable root-level))
   (write-object (reference obj)))
+
+(defgeneric write-document (target &optional document))
 
 (defmethod write-document ((s stream) &optional (document *document*))
    (let ((*xrefs* (make-array 10 :adjustable t :fill-pointer 0))
