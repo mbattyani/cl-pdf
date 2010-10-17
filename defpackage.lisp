@@ -38,6 +38,7 @@
    #:close-even-odd-fill-and-stroke #:end-path-no-op #:clip-path #:even-odd-clip-path
    #:set-gray-stroke #:set-gray-fill #:set-rgb-stroke #:set-rgb-fill #:set-cymk-stroke
    #:set-color-stroke #:set-color-fill 
+   #:set-transparency #:set-fill-transparency #:set-stroke-transparency
    #:set-cymk-fill #:paint-image #:draw-image #:get-named-reference #:register-page-reference
    #:add-link #:add-URI-link #:add-external-link #:read-jpeg-file #:make-jpeg-image
    #:make-image #:width #:height
@@ -48,4 +49,5 @@
    #:load-t1-font #:load-ttu-font #:encoding #:get-encoding
    #:draw-bar-code128 #:*page-number*
    #:test-template #:make-template-from-page #:add-templates-to-page #:draw-template
-   ))
+
+   #:image-file-parse-error))

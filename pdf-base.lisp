@@ -304,6 +304,39 @@
 
 (def-pdf-op set-cymk-fill (c y m k) "~5f ~5f ~5f ~5f k~%")
 
+;;; Transparency support by Eric Marsden
+;;; Affects both stroking operations ("CA" op) and non-stroking ("ca" op)
+;;; alpha ranges from 0 (transparent) to 1 (opaque)
+
+(defun set-transparency (alpha &optional (blend-mode :normal))
+  (declare (type float alpha))
+  (let* ((a (format nil "~3F" alpha))
+         (bm (ecase blend-mode
+               (:normal "/Normal")
+               (:multiple "/Multiply")
+               (:screen "/Screen")
+               (:overlay "/Overlay")
+               (:darken "/Darken")
+               (:lighten "/Lighten")
+               (:ColorDodge "/ColorDodge")
+               (:ColorBurn "/ColorBurn")
+               (:HardLight "/HardLight")
+               (:SoftLight "/SoftLight")
+               (:difference "/Difference")
+               (:exclusion "/Exclusion")
+               (:saturation "/Saturation")
+               (:color "/Color")
+               (:luminosity "/Luminosity"))))
+    (set-gstate "CA" a "ca" a "BM" bm)))
+
+(defun set-fill-transparency (alpha)
+  (declare (type float alpha))
+  (set-gstate "ca" (format nil "~3F" alpha)))
+
+(defun set-stroke-transparency (alpha)
+  (declare (type float alpha))
+  (set-gstate "CA" (format nil "~3F" alpha)))
+
 (defun draw-image (image x y dx dy rotation &optional keep-aspect-ratio)
   (when keep-aspect-ratio
     (let ((r1 (/ dy dx))
@@ -348,6 +381,22 @@
    (nb-components :accessor nb-components :initarg :nb-components)
    (data   :accessor data :initarg :data)))
 
+;;; Condition class of errors while parsing image files.
+;;; Sometimes the parser of specific format cannot identify what is wrong an end-of-file
+;;; is signaled. Both situations can be trapped by handling stream-error.
+;;; CAUTION: Could the stream slot hold a pathname (not only stream)?
+
+(define-condition image-file-parse-error (parse-error stream-error)
+  ((message :initarg :message :reader error-message))
+  (:report (lambda (condition stream)
+             (let ((stream-error-stream (stream-error-stream condition)))
+               (format stream "Error~@[ at position ~d~] while reading image file~%~ ~a.~@[~%~a.]"
+                       (if (streamp stream-error-stream)
+                           (file-position stream-error-stream)
+                           nil)
+                       (pathname stream-error-stream)
+                       (error-message condition))))))
+
 (defclass jpeg-image (bitmap-image)
   ())
 
@@ -362,7 +411,8 @@
                ;; SOF markers
 		 (read-byte s)(read-byte s) ;size
                (when (/= (read-byte s) 8)
-                 (error "JPEG must have 8bits per component"))
+                 (error 'image-file-parse-error :stream s
+                        :message "JPEG must have 8bits per component"))
                (setf height (+ (ash (read-byte s) 8) (read-byte s))
                      width (+ (ash (read-byte s) 8) (read-byte s))
                      nb-components (read-byte s))
@@ -373,9 +423,10 @@
 		 (return (values nb-components width height data)))
               ((member marker '(#xC3 #xC5 #xC6 #xC7 #xC8 #xC9 #xCA #xCB #xCD #xCE #xCF))
                ;; unsupported markers
-		 (error "Unsupported JPEG format"))
+               (error 'image-file-parse-error :stream s
+                      :message "Unsupported JPEG format"))
               ((not (member marker '(#xD0 #xD1 #xD2 #xD3 #xD4 #xD5 #xD6 #xD7 #xD8 #x01)))
-               ;; no param markers
+               ;; no param markers. CAUTION 2010-Oct-17: Was -2!
 		 (file-position s (+ (file-position s) (ash (read-byte s) 8) (read-byte s))))))))
 
 (defun read-jpeg-file (filename &key header-only)
@@ -404,7 +455,8 @@
          (apply 'make-image (read-jpeg-file object) args))
         ((equalp type "png")
          (apply 'make-image (read-png-file object) args))
-        (t (error "Unsupported image file type ~s." type))))
+        (t (error 'image-file-parse-error :stream object
+                  :message (format nil "Unsupported image file type ~s" type)))))
 
 (defmethod make-image ((object string) &rest args &key type)
   (apply #'make-image (merge-pathnames object (make-pathname :type type))

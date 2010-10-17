@@ -58,12 +58,14 @@
                  (= (read-byte stream) 10)
                  (= (read-byte stream) 26)
                  (= (read-byte stream) 10))
-      (error "Incorrect PNG file ~s - wrong signature." pathname))
+      (error 'image-file-parse-error :stream pathname
+             :message "Wrong PNG signature"))
 
     ;; Read header
     (skip-octets 4)
     (when (string/= (read-base-string stream 4) "IHDR")
-      (error "Incorrect PNG file ~s - wrong header." pathname))
+      (error 'image-file-parse-error :stream stream
+             :message "Wrong PNG header"))
     (let* ((width (read-byte32 stream))
            (height (read-byte32 stream))
            (bits-per-color (read-byte stream))
@@ -72,12 +74,21 @@
                           (0 "DeviceGray")
                           (2 "DeviceRGB")
                           (3 "Indexed")
-                          (otherwise (error "Alpha channel not supported ~s" pathname))))
+                          (otherwise (error 'image-file-parse-error :stream stream
+                                            :message "Alpha channel is not supported"))))
            palette mask data)
-      (when (> bits-per-color 8) (error "16-bit depth not supported ~s" pathname))
-      (when (/= (read-byte stream) 0) (error "Unknown compression method ~s" pathname))
-      (when (/= (read-byte stream) 0) (error "Unknown filter method ~s" pathname))
-      (when (/= (read-byte stream) 0) (error "Interlacing not supported ~s" pathname))
+      (when (> bits-per-color 8)
+        (error 'image-file-parse-error :stream stream
+               :message "16-bit depth is not supported"))
+      (when (/= (read-byte stream) 0)
+        (error 'image-file-parse-error :stream stream
+               :message "Unknown compression method"))
+      (when (/= (read-byte stream) 0)
+        (error 'image-file-parse-error :stream stream
+               :message "Unknown filter method"))
+      (when (/= (read-byte stream) 0)
+        (error 'image-file-parse-error :stream stream
+               :message "Interlacing is not supported"))
       (skip-octets 4)
 
       ;; Extract palette, transparency and data if any
@@ -119,7 +130,8 @@
         (skip-octets 4))
 
       (when (and (= cs 3) (null palette))			; Indexed
-        (error "Palette is missing in ~s" pathname))
+        (error 'image-file-parse-error :stream stream
+               :message "Palette is missing"))
       (make-instance 'png-image :nb-components color-space
 		     :width width :height height  :data data
                      :bits-per-color bits-per-color  :palette palette  :mask mask)))))
