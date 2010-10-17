@@ -525,3 +525,33 @@
 	    (pdf:paint-image image)))))
     (pdf:write-document file)))
 
+;;; Example 10: trnasparency by Eric Marsden
+
+(defun example10 (&optional (file #p"/tmp/ex10.pdf"))
+  (pdf:with-document ()
+    (dolist (bm '(:normal :multiple :screen :overlay :darken :lighten :ColorDodge :ColorBurn
+                  :HardLight :SoftLight :difference :exclusion :saturation :color :luminosity))
+      (let ((helvetica (pdf:get-font "Helvetica")))
+        (pdf:with-page ()
+          (pdf:with-outline-level ((format nil "Blend mode ~A" bm) (pdf:register-page-reference))
+            (pdf:in-text-mode
+              (pdf:set-font helvetica 14.0)
+              (pdf:move-text 15 820)
+              (pdf:draw-text (format nil "PDF transparency with ~A blend-mode" bm)))
+            (dotimes (y 10)
+              (pdf:in-text-mode
+                (pdf:set-font helvetica 10.0)
+                (pdf:set-rgb-fill 0 0 0)
+                (pdf:move-text 10 (+ 45 (* y 80)))
+                (pdf:draw-text (format nil "Alpha = ~,1F" (/ y 9.0))))
+              (pdf:set-rgb-fill 1 0.6 0.2)
+              (pdf:rectangle 70 (+ 20 (* y 80)) 500 30)
+              (pdf:fill-path))
+            (pdf:translate 100 50)
+            (dotimes (y 10)
+              (dotimes (x 10)
+                (apply #'pdf:set-rgb-fill (hsv->rgb (/ x 9.1) 1 1))
+                (pdf:set-transparency (/ y 9.0) bm)
+                (pdf:circle (* x 50) (* y 80) 30)
+                (pdf:fill-path))))))
+      (pdf:write-document file))))
