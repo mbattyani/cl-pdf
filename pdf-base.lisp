@@ -387,10 +387,10 @@
 ;;; CAUTION: Could the stream slot hold a pathname (not only stream)?
 
 (define-condition image-file-parse-error (parse-error stream-error)
-  ((message :initarg :message :reader error-message))
+  ((message :initarg :message :reader error-message :initform nil))
   (:report (lambda (condition stream)
              (let ((stream-error-stream (stream-error-stream condition)))
-               (format stream "Error~@[ at position ~d~] while reading image file~%~ ~a.~@[~%~a.]"
+               (format stream "Error~@[ at position ~d~] while reading image file~% ~a.~@[~%~a.~]"
                        (if (streamp stream-error-stream)
                            (file-position stream-error-stream)
                            nil)
