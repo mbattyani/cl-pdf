@@ -4,7 +4,7 @@
 
 (in-package #:pdf)
 
-;;; Geometry functions contributed by Eduardo Muñoz
+;;; Geometry functions contributed by Eduardo Munoz
 
 ;;; Exported functions
 
@@ -165,7 +165,7 @@
 ;;; (midpoint <point> <point> <real>)
 ;;;
 ;;; Devuelve un punto situado entre los dos que se dan como argumento. El
-;;; factor de posición indica la relación de las distancias entre los puntos
+;;; factor de posicion indica la relacion de las distancias entre los puntos
 ;;; de entrada y el de salida.
 ;;;
 
