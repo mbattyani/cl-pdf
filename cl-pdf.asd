@@ -30,9 +30,6 @@
   (pushnew :uffi *features*)
   (print "UFFI loaded."))
 
-#+use-salza-zlib
-(load (merge-pathnames "salza/salza.asd" *load-truename*))
-
 #+clisp (setf *warn-on-floating-point-contagion* nil)
 
 (defsystem :cl-pdf
@@ -48,14 +45,14 @@
   :components ((:file "defpackage")
 	       (:file "config" :depends-on ("defpackage"))
 	       #+use-uffi-zlib (:file "init" :depends-on ("config"))
-	       (:file "zlib" 
+	       (:file "zlib"
 		      :depends-on ("config" "defpackage"
 					    #+use-uffi-zlib "init"))
 	       (:file "font-metrics"  :depends-on ("config"))
-	       (:file "encodings"  :depends-on ("defpackage"))
+	       (:file "encodings"  :depends-on ("config"))
 	       (:file "t1-font" :depends-on ("font-metrics" "encodings"))
 	       (:file "ttu-font" :depends-on ("font-metrics"))
-	       (:file "font" :depends-on ("t1-font"))
+	       (:file "font" :depends-on ("t1-font" "ttu-font"))
 	       (:file "pdf" :depends-on ("font"))
 	       (:file "x11-colors" :depends-on ("defpackage"))
 	       (:file "pdf-base" :depends-on ("pdf" "x11-colors"))

@@ -155,6 +155,7 @@
   (write-char #\) *page-stream*))
 
 (defmethod write-to-page ((char character) (encoding unicode-encoding) &optional escape)
+  (declare (ignorable encoding escape))
   (write-char #\< *page-stream*)
   (format *page-stream* "~4,'0x" (char-code char))
   (write-char #\> *page-stream*))
@@ -264,7 +265,7 @@
 (def-pdf-op set-rgb-stroke (r g b) "~5f ~5f ~5f RG~%")
 
 (defgeneric get-rgb (color)
- (:method ((color list))  
+ (:method ((color list))
   (values (first color)(second color)(third color)))
 
  (:method ((color vector))
@@ -287,7 +288,7 @@
  (:method ((color integer))	; a la CSS but specified as a Lisp number like #xCCBBFF
   (values (/ (ldb (byte 8 16) color) 255.0)
           (/ (ldb (byte 8 8) color) 255.0)
-          (/ (ldb (byte 8 0) color) 255.0))) 
+          (/ (ldb (byte 8 0) color) 255.0)))
 
  (:method ((color symbol))	; :blue, :darkgreen, or win32:color_3dface
    (find-color-from-symbol color)))

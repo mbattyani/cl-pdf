@@ -15,7 +15,7 @@
 	  (progn
 	    (format t "~&;;; Loading ~s" zlib-path)
 	    (uffi:load-foreign-library zlib-path
-				       :module "zlib" 
+				       :module "zlib"
 				       :supporting-libraries '("c"))
 	    (uffi:def-function ("compress" c-compress)
 		((dest (* :unsigned-char))
@@ -43,7 +43,7 @@
 	    (newdestlen (uffi:deref-pointer destlen :long)))
 	(unwind-protect
 	     (if (zerop result)
-		 (values (uffi:convert-from-foreign-string 
+		 (values (uffi:convert-from-foreign-string
 			  dest
 ;			  :external-format '(:latin-1 :eol-style :lf)
 			  :length newdestlen
@@ -94,7 +94,7 @@
          (zlib-buffer (make-array buffer-size :element-type 'salza::octet))
          (chunks ()))
     (flet ((zlib-callback (zlib-stream)
-	     (push (subseq (salza::zlib-stream-buffer zlib-stream) 
+	     (push (subseq (salza::zlib-stream-buffer zlib-stream)
 			   0 (salza::zlib-stream-position zlib-stream)) chunks)
 	     (setf (salza::zlib-stream-position zlib-stream) 0)))
       (let ((zlib-stream (salza::make-zlib-stream zlib-buffer :callback #'zlib-callback)))
@@ -162,4 +162,3 @@
 ;;; load it!
 
 (load-zlib)
-

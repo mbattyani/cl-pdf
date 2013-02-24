@@ -42,7 +42,7 @@
         (setf (pdf-widths font) (pdf-widths font-metrics)
               (characters font) (encoding-vector font-metrics)
               (hyphen-code font) (if (gethash "hyphen" (characters font-metrics))
-                                     (code (gethash "hyphen" (characters font-metrics))) 
+                                     (code (gethash "hyphen" (characters font-metrics)))
                                      0)
               (hyphen-char font) (code-char (hyphen-code font)))
         (loop with font-characters = (characters font-metrics)
@@ -93,18 +93,18 @@
 
 (defmethod get-char-metrics (char font (encoding single-byte-encoding))
   (aref (characters font)
-        (if #+lispworks (lw:base-char-p char) 
-            #+(or allegro sbcl) (standard-char-p char)
-            #-(or lispworks allegro sbcl) t
+        (if #+lispworks (lw:base-char-p char)
+            #+(or allegro sbcl clisp) (standard-char-p char)
+            #-(or lispworks allegro sbcl clisp) t
             (char-code char)
             (char-external-code char (charset encoding)))))
 
 (defmethod get-char-metrics ((code integer) font (encoding single-byte-encoding))
   (let ((char (code-char code)))
   (aref (characters font)
-        (if #+lispworks (lw:base-char-p char) 
-              #+(or allegro sbcl) (standard-char-p char)
-              #-(or lispworks allegro sbcl) t
+        (if #+lispworks (lw:base-char-p char)
+              #+(or allegro sbcl clisp) (standard-char-p char)
+              #-(or lispworks allegro sbcl clisp) t
             code
               (char-external-code char (charset encoding))))))
 
@@ -117,7 +117,7 @@
   (let ((char (gensym "char")))
     `(let ((,char ,char-or-code))
       (if (characterp ,char) (char-code ,char) ,char))))
- 
+
 (defun get-char-width (char-or-code font &optional font-size)
   (let ((char-metrics (get-char-metrics char-or-code font (encoding font))))
     (if font-size (* (width char-metrics) font-size) (width char-metrics))))

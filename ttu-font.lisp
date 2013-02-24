@@ -2,9 +2,9 @@
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 ;;; The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
 
-;;; 
+;;;
 ;;; (c) copyright 2005 by Aleksandar Bakic (a_bakic@yahoo.com)
-;;; 
+;;;
 
 ;;; Support for TrueTypeUnicode fonts
 

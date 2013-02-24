@@ -85,7 +85,7 @@
       (pdf:with-outline-level ("Example" (pdf:register-page-reference))
 	(let* ((helvetica (pdf:get-font "Helvetica"))
 	       (image (make-instance 'pdf:image
-				     :bits (gen-image-bits) 
+				     :bits (gen-image-bits)
 				     :width 201 :height 201)))
 	  (pdf:draw-bar-code128 "30A0033111436" 20 100)
 	  (pdf:add-images-to-page image)
@@ -139,7 +139,7 @@
       )))
 
 (defun %down-fractal (x y dx dy level)
-  (setf level 0) 
+  (setf level 0)
   (if (zerop level)
     (let ((dx/2 (* dx 0.5))
 	  (dy/2 (* dy 0.5)))
@@ -190,7 +190,7 @@
 (defvar *dy* #(0 1 0 -1))
 
 ;make-maze
-(defun example5 (nx ny &key (size 10) (file #P"/tmp/ex5.pdf"))
+(defun example5 (&key (nx 100) (ny 150) (size 5) (file #P"/tmp/ex5.pdf"))
   (let ((x-stack '())
 	(y-stack '())
 	(visited (make-array (list nx ny) :initial-element nil))
@@ -283,13 +283,13 @@
 	  (pdf:close-fill-and-stroke)
 	  (pdf:star 350 0 50 30 6 :fillet-radius 5)
 	  (pdf:close-fill-and-stroke)
-	  
+
 	  (pdf:set-rgb-fill 0.8 0.6 0.2)
 	  (pdf:regular-polygon 150 0 30 5 :fillet-radius 4)
 	  (pdf:close-fill-and-stroke)
 	  (pdf:star 350 0 40 20 4 :fillet-radius 6)
 	  (pdf:close-fill-and-stroke)
-	  
+
 	  (pdf:set-rgb-fill 0.4 0.8 0.7)
 	  (pdf:regular-polygon 150 0 15 3 :fillet-radius 3)
 	  (pdf:close-fill-and-stroke)
@@ -369,7 +369,7 @@
 	     (pdf:move-text 500 10)
 	     (pdf:draw-text "goto page 1"))
 	    (pdf:add-link 495 8 80 14 "page 1")
-	    (pdf:draw-object 
+	    (pdf:draw-object
 	     (make-instance 'pdf:plot-xy :x 100 :y 400 :width 400 :height 200
 			    :labels&colors '(("Data 1" (1.0 0.0 0.0))
 					     ("Data 2" (0.0 1.0 0.0))
@@ -388,7 +388,7 @@
 (defun vk-fractal (l level)
   (pdf:with-saved-state
       (if (zerop level)
-          (progn 
+          (progn
             (pdf:move-to 0 0)
             (pdf:line-to l 0)
             (pdf:stroke))
@@ -406,7 +406,7 @@
 	       (pdf:with-outline-level ((format nil "Page ~d" i)(pdf:register-page-reference))
 		 (let* ((helvetica (pdf:get-font "Helvetica" :win-ansi-encoding)))
 		   (pdf:draw-centered-text 297 800
-					   (format nil "Koch's flake (Level ~d, ~d segments, perimeter ~,1f mm)" 
+					   (format nil "Koch's flake (Level ~d, ~d segments, perimeter ~,1f mm)"
 						   i (* 3 (expt 4 i))(/ (* 180 (* 3 (expt 4 i)))(expt 3 i)))
 				      helvetica 18.0)
                    (pdf:translate 42 530)
@@ -456,7 +456,7 @@
 
 
 (defun gen-mandelbrot-bits (w h)
-  ;; Inside a Moth by Lahvak, for other interesting regions see 
+  ;; Inside a Moth by Lahvak, for other interesting regions see
   ;;     http://fract.ygingras.net/top
 
   ;; TODO:AA
@@ -470,33 +470,31 @@
 	 (cols (make-color-map nb-cols 1 0.2 0.9 0.24 0.21 t))
 	 (c #c(0d0 0d0))
 	 (z #c(0d0 0d0))
-	 (region nil)) 
+	 (region nil))
     (declare (type double-float inc))
     (dotimes (i h)
       (dotimes (j w)
-	(setf c (complex (+ (realpart center) 
+	(setf c (complex (+ (realpart center)
 			    (* inc (+ (the fixnum j) (/ w -2d0))))
-			 (+ (imagpart center) 
+			 (+ (imagpart center)
 			    (* inc (+ (the fixnum i) (/ h -2d0)))))
 	      z #c(0d0 0d0))
 	;; standard Mandelbrot Set formula
 	(push (dotimes (n nb-iter 0)
 		(setf z (+ (* z z) c))
-		(let ((real (realpart z))
-		      (imag (imagpart z)))
-		  (when (< 2 (abs z))
-		    (return (- nb-iter 
-			       ;; sub-iter smoothing
-			       (- n (log (log (abs (+ (* z z) c)) 10) 2)))))))
+		(when (< 2 (abs z))
+                  (return (- nb-iter
+                             ;; sub-iter smoothing
+                             (- n (log (log (abs (+ (* z z) c)) 10) 2))))))
 	      region)))
     (with-output-to-string (s)
       (let ((max (reduce #'max region)))
 	(dolist (x (nreverse region))
-	  (destructuring-bind (r g b) 
+	  (destructuring-bind (r g b)
 	      (if (zerop x)
 		  '(0 0 0)
 		  ;; pallette stretching
-		  (elt cols (floor (expt (/ x max) (/ nb-iter 256)) 
+		  (elt cols (floor (expt (/ x max) (/ nb-iter 256))
 				   (/ 1 (1- nb-cols)))))
 	    (format s "~2,'0x~2,'0x~2,'0x" r g b)))))))
 
@@ -512,7 +510,7 @@
 	       (h 750)
 	       (helvetica (pdf:get-font "Helvetica"))
 	       (image (make-instance 'pdf:image
-				     :bits (gen-mandelbrot-bits w h) 
+				     :bits (gen-mandelbrot-bits w h)
 				     :width w :height h)))
 	  (pdf:add-images-to-page image)
 	  (pdf:in-text-mode

@@ -45,33 +45,40 @@
                (+ center-x radius-a) center-y)))
 
 (defun rectangle (x y dx dy &key (radius 0))
-  (if (zerop radius)
+  (assert (or (and (listp radius) (= 4 (length radius))) (numberp radius)))
+  (if (and (numberp radius) (zerop radius))
       (basic-rect x y dx dy)
       (progn
-        (move-to (+ x dx) (- (+ y dy) radius))
-        (polyline (list (list x y) (list (+ x dx) y)
-                        (list (+ x dx) (+ y dy)) (list x (+ y dy)))
-                  :radius radius :closed t))))
+	(move-to (+ x dx) (- (+ y dy) (if (listp radius) (car radius) radius)))
+	(polyline (list (list x y) (list (+ x dx) y)
+			(list (+ x dx) (+ y dy)) (list x (+ y dy)))
+		  :radius radius :closed t))))
 
 (defun polyline (points &key (radius 0) (closed nil))
-  (if (zerop radius)
-      (destructuring-bind ((x1 y1) . other-points) points
-        (move-to x1 y1)
-        (loop for (x y) in other-points
-              do (line-to x y)
-              finally (when closed (line-to x1 y1))))
-      (progn
-          (when closed
-            (let ((break-point (midpoint (first points) (first (last points)) 0.5)))
-              (setf points `(,break-point ,@points ,break-point))))
-          (move-to (first (first points)) (second (first points)))
-          (dotimes (i (- (length points) 2))
-            (let ((p1 (nth i points))
-                  (p2 (nth (1+ i) points))
-                  (p3 (nth (+ 2 i) points)))
-              (fillet p2 p1 p3 radius)))
-          (line-to (first (first (last points)))
-                   (second (first (last points)))))))
+  (assert (or (and (listp radius) (= (length points) (length radius))) (numberp radius)))
+  (cond ((listp radius)
+	 (naive-polyline points :radius radius :closed closed))
+	((zerop radius)
+	 (destructuring-bind ((x1 y1) . other-points) points
+	   (move-to x1 y1)
+	   (loop for (x y) in other-points
+		 do (line-to x y)
+		 finally (when closed (line-to x1 y1)))))
+	((numberp radius)
+	 (naive-polyline points :radius (make-list (length points) :initial-element radius) :closed closed))))
+
+(defun naive-polyline (points &key radius (closed nil))
+  "Takes a list of points and radii and returns a curved list."
+  (assert (and (listp radius) (= (length radius) (length points))))
+  (let* ((break-point (midpoint (first points) (first (last points)) 0.5))
+	 (pts (if closed `(,break-point ,@points ,break-point) points)))
+    (destructuring-bind ((start-x start-y) ((end-x end-y))) (list (first pts) (last pts))
+      (move-to start-x start-y)
+      (loop for (p1 p2 p3) on pts
+	    until (null p3)
+	    for r in radius
+	    do (fillet p2 p1 p3 r))
+      (line-to end-x end-y))))
 
 (defun regular-polygon (center-x center-y radius sides &key (fillet-radius 0))
   (polyline (loop with step-angle = (/ +2pi+ sides)
@@ -202,4 +209,3 @@
           (line-to (first t2) (second t2))
           (arc-to (first center) (second center) radius
                   (angle center t2) (angle-3points center t2 t3))))))
-

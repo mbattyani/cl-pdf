@@ -42,14 +42,16 @@
 
 (defmethod initialize-instance :after ((obj pdf-stream) &key empty &allow-other-keys)
   (unless empty
-    (add-dict-value obj "/Length" 
-		    #'(lambda () 
+    (add-dict-value obj "/Length"
+		    #'(lambda ()
 			(let ((content (content obj)))
 			  (if (consp content)
 			      (reduce #'+ content :key #'length)
 			      (length content)))))))
 
 (defun compress-pdf-stream (pdf-stream)
+;  #+use-no-zlib (declare (ignore pdf-stream))
+;  #-use-no-zlib
   (when (and *compress-streams* (not (no-compression pdf-stream))
 	     (> (length (content pdf-stream)) *min-size-for-compression*))
     (setf (content pdf-stream) (compress-string (content pdf-stream)))
@@ -104,7 +106,7 @@
                                                  (:thumbs   "/UseThumbs")
                                                  (:full     "/FullScreen")
                                                  (otherwise (pdf-name mode)))))) )))
-      (add-doc-info doc :creator creator :author author 
+      (add-doc-info doc :creator creator :author author
 		    :title title :subject subject :keywords keywords) )))
 
 (defun add-doc-info (doc &key (creator "") author title subject keywords)
@@ -312,7 +314,7 @@
 
 (defun add-/ (name)
   (concatenate 'string "/" name))
- 
+
 (defclass encoding-object (indirect-object)
   ((encoding :accessor encoding :initarg :encoding)))
 
@@ -338,7 +340,7 @@
                                                :font font :embed embed)))
 
 (defun find-font-object (font &key (embed :default))
-  (let ((font-object (cdr (assoc font (fonts *document*))))) 
+  (let ((font-object (cdr (assoc font (fonts *document*)))))
     (unless font-object
       (setf font-object (make-instance 'font-object :font font :embed embed))
       (push (cons font font-object) (fonts *document*)))
@@ -395,7 +397,7 @@
 	       :dict-values `(("/Type" . "/XObject")("/Subtype" . "/Image")
 			      ("/Width" . ,width)("/Height" . ,height)
 			      ("/Filter" . ,filter)
-                              ,@(when decode-parms `(("/DecodeParms" . 
+                              ,@(when decode-parms `(("/DecodeParms" .
                                                       ,(make-instance 'dictionary
                                                          :dict-values decode-parms))))
 			      ("/ColorSpace" . ,color-space)
@@ -574,7 +576,7 @@
 (defmethod write-document ((filename pathname) &optional (document *document*))
    (with-open-file (stream filename
                            :direction :output :if-exists :supersede
-                           :element-type #+pdf-binary #+sbcl :default #-sbcl'(unsigned-byte 8) 
+                           :element-type #+pdf-binary #+sbcl :default #-sbcl'(unsigned-byte 8)
                                          #-pdf-binary 'base-char
                            :external-format +external-format+)
      (write-document stream document)
@@ -612,5 +614,3 @@
 	 (with-output-to-string (*page-stream*)
 	   ,@body)))
      t))
-
-

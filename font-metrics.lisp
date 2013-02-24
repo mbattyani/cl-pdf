@@ -241,7 +241,7 @@
 	(encoding (encoding-vector font-metrics))
 	char-metrics)
     (setf (gethash "VoidCharacter" metrics)
-	  (make-instance 'char-metrics :code -1 :name "VoidChar" :index 0 
+	  (make-instance 'char-metrics :code -1 :name "VoidChar" :index 0
                          :width 0 :bbox #(0 0 0 0) :spacing 0))
     (process-keywords
      (key "EndCharMetrics" () (return-from afm-char-metrics metrics))
@@ -367,4 +367,3 @@
 		       :char-names (map 'vector #'(lambda (char)
 						    (and char (name char)))
 					(encoding-vector font-metrics))))))
-

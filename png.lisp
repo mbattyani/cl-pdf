@@ -10,11 +10,11 @@
 ;;;	[/PDF /Text /ImageB /ImageC /ImageI]
 ;;;  for compatibility with existing viewer applications.
 ;;;  It is considered obsolete in PDF 1.4 (section 9.1)
-;;; 
+;;;
 ;;;  Acrobat error "There was an error processing a page. A drawing error occurred"
 ;;;  Reason: Acrobat 5 has a bug and is unable to display transparent monochrome images.
 ;;;  Workaround: Remove transparency or save your image in 16 colors (4 bits per pixel)
-;;;  or more. 
+;;;  or more.
 
 
 (declaim (ftype (function (stream) (unsigned-byte 16)) read-byte16)
@@ -48,7 +48,7 @@
    (flet ((skip-octets (octet-length)
             (dotimes (i octet-length) (read-byte stream))
             (values)))
-    (declare (ftype (function (fixnum) (values)) skip-octets))
+    #-lispworks(declare (ftype (function (fixnum) (values)) skip-octets))
     ;; Check signature
     (unless (and (= (read-byte stream) 137)
                  (= (read-byte stream) #.(char-code #\P))
@@ -169,5 +169,3 @@
                          ("/BitsPerComponent" . ,(bits-per-color png))
                          ("/Columns" . ,(width png)))
          :no-compression t)))				; data bits already come compressed
-
-
