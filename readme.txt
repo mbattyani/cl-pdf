@@ -1,6 +1,6 @@
 cl-pdf copyright 2002-2005 Marc Battyani see license.txt for the details
-You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
-The homepage of cl-pdf is here: http://www.fractalconcept.com/asp/html/cl-pdf.html
+
+WARNING: cl-pdf is moving to https://github.com/mbattyani/cl-pdf.git
 
 CL-PDF is a cross-platform Common Lisp library for generating PDF files.
 It does not need any third-party tools from Adobe or others.
@@ -25,7 +25,7 @@ In case of problems, first disable the zlib compression and try again...
 You need to get a post 23-dec-2002 UFFI version if you use the UFFI zlib binding.
 
 Contributions ar welcome!
-For questions, comments, bugs, typos, etc. use the mailing list 
+For questions, comments, bugs, typos, etc. use the mailing list
 
 You can look at some CL-PDF examples here:
 http://www.fractalconcept.com/asp/html/e-cl-pdf.html
