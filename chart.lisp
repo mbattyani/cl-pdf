@@ -13,7 +13,7 @@
 ;; the pre and post draw functions must have this signature:
 ;; (defun pre-draw-chart (object dx dy x-scale y-scale x-min y-min x-max y-max) ...)
 
-(defvar *default-chart-font* (get-font))
+;;(defvar *default-chart-font* (get-font))
 
 (defclass chart-item ()
   ((x :accessor x :initform 0 :initarg :x)
@@ -22,7 +22,7 @@
    (height :accessor height :initform 0 :initarg :height)
    (background-color :accessor background-color :initform '(1 1 1) :initarg :background-color)
    (title :accessor title :initform "" :initarg :title)
-   (title-font :accessor title-font :initform *default-chart-font* :initarg :title-font)
+   (title-font :accessor title-font :initform (get-font) :initarg :title-font)
    (title-font-size :accessor title-font-size :initform 12 :initarg :title-font-size)
    (title-color :accessor title-color :initform '(0 0 0) :initarg :title-color)
    (line-width :accessor line-width :initform 0.5 :initarg :line-width)
@@ -32,7 +32,7 @@
    ))
 
 (defclass axis (chart-item)
-  ((label-font :accessor label-font :initform *default-chart-font* :initarg :label-font)
+  ((label-font :accessor label-font :initform (get-font) :initarg :label-font)
    (label-font-size :accessor label-font-size :initform 10.0 :initarg :label-font-size)
    (label-position :accessor label-position :initform :center :initarg :label-position)
    (label-rotation :accessor label-rotation :initform 0 :initarg :label-rotation)
@@ -98,7 +98,7 @@
 (defun nice-number (n approx integer-p)
   (let* ((n10 (expt 10 (floor (log n 10))))
 	 (nf (/ n n10))
-	 (value 
+	 (value
 	  (loop for (max val) in (if approx '((1.5 1)(3 2)(7 5)(15 10)) '((1 1)(2 2)(5 5)(15 10)))
 		when (<= nf max) do (return (* val n10)))))
     (if integer-p
@@ -191,7 +191,7 @@
 	  (draw-left-text text-x text-y (format nil format value) (label-font axis) font-size))))
 
 (defclass legend (chart-item)
-  ((label-font :accessor label-font :initform *default-chart-font* :initarg :label-font)
+  ((label-font :accessor label-font :initform (get-font) :initarg :label-font)
    (label-font-size :accessor label-font-size :initform 10.0 :initarg :label-font-size)
    (label-color :accessor label-color :initform '(0 0 0) :initarg :label-color)
    (labels&colors :accessor labels&colors :initform () :initarg :labels&colors)
@@ -467,7 +467,7 @@
       (basic-rect 0 0 width height)
       (fill-and-stroke)
       (when (pre-draw-chart-fn obj)
-	(funcall (pre-draw-chart-fn obj) obj width height scale-x scale-y 
+	(funcall (pre-draw-chart-fn obj) obj width height scale-x scale-y
 		 min-value-x min-value-y max-value-x max-value-y))
       (set-line-width (h-lines-width obj))
       (apply #'set-rgb-stroke (h-lines-color obj))
@@ -504,7 +504,7 @@
 	     (map nil 'polyline all-points)
 	     (stroke)))
       (when (post-draw-chart-fn obj)
-	(funcall (post-draw-chart-fn obj) obj width height scale-x scale-y 
+	(funcall (post-draw-chart-fn obj) obj width height scale-x scale-y
 		 min-value-x min-value-y max-value-x max-value-y))))
   (draw-object (x-axis obj))
   (draw-object (y-axis obj))

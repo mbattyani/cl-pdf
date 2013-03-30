@@ -60,5 +60,6 @@
 	       (:file "pdf-geom" :depends-on ("pdf-base"))
 	       (:file "text" :depends-on ("pdf-base"))
 	       (:file "bar-codes" :depends-on ("pdf-geom"))
-	       (:file "chart" :depends-on ("text" "pdf-geom")))
+	       (:file "chart" :depends-on ("text" "pdf-geom"))
+	       (:file "zzinit" :depends-on ("config")))
   :depends-on (:iterate #+use-salza-zlib :salza #+use-salza2-zlib :salza2))

@@ -49,5 +49,4 @@
    #:load-t1-font #:load-ttu-font #:encoding #:get-encoding
    #:draw-bar-code128 #:*page-number*
    #:test-template #:make-template-from-page #:add-templates-to-page #:draw-template
-
-   #:image-file-parse-error))
+   #:image-file-parse-error #:initialize! #:confirm-afm-files-directories))
