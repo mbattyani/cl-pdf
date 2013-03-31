@@ -572,7 +572,7 @@
 	 (write-object (docinfo document)))
        (format s "~%>>~%startxref~%~d~%%%EOF~%" startxref))))
 
-#-allegro
+#-(or allegro ecl)
 (defmethod write-document ((filename pathname) &optional (document *document*))
    (with-open-file (stream filename
                            :direction :output :if-exists :supersede
@@ -582,7 +582,7 @@
      (write-document stream document)
      filename))				; indicate that operation succeeded
 
-#+allegro
+#+(or allegro ecl)
 (defmethod write-document ((filename pathname) &optional (document *document*))
    (with-open-file (stream filename
                            :direction :output :if-exists :supersede

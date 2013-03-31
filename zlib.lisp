@@ -119,17 +119,21 @@
   #+(and sbcl (not octet-characters))
   (sb-ext:string-to-octets string :external-format :iso-8859-1 :start start :end end)
   #+(and allegro (not octet-characters))
-  (excl:string-to-octets string :start start :end end :null-terminate nil)
+  (excl:string-to-octets string :external-format :octets :start start :end end :null-terminate nil)
   #+(and clisp (not octet-characters))
   (ext:convert-string-to-bytes string custom:*default-file-encoding* :start start :end end)
-  #+(or octet-characters lispworks)
+  #+(and ccl (not octet-characters))
+  (ccl:encode-string-to-octets string :external-format :latin-1 :start start :end end)
+  #+(and cmu (not octet-characters))
+  (ext:string-to-octets string :external-format :iso-8859-1 :start start :end end)
+  #+(or octet-characters lispworks abcl ecl)
   (let* ((length (- end start))
-	 (result (make-array length :element-type 'octet)))
+	 (result (make-array length :element-type 'salza2::octet)))
     (loop for i fixnum from start below end
 	  for j fixnum from 0
 	  do (setf (aref result j) (char-code (aref string i))))
     result)
-  #+(and (not octet-characters) (not (or sbcl allegro clisp lispworks)))
+  #+(and (not octet-characters) (not (or sbcl allegro clisp ccl cmu lispworks abcl ecl)))
   (error "Do not know how to convert a string to octets."))
 
 #+use-salza2-zlib
@@ -147,7 +151,6 @@
 	(salza2:compress-octet-vector input compressor)
 	(salza2:finish-compression compressor)))
     (reverse chunks)))
-
 
 ;;; no-zlib
 #+use-no-zlib

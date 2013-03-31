@@ -9,14 +9,14 @@
 
 (defconstant +external-format+
   #-(or sbcl lispworks clisp allegro) :default
+  #+abcl '(:iso-8859-1 :eol-style :lf)
+  #+ecl '(:latin-1 :lf)
+  #+ccl :latin1
   #+sbcl :latin-1
   #+(and allegro mswindows) :octets
   #+(and allegro unix) :default
   #+lispworks '(:latin-1 :eol-style :lf)
-  #+clisp :unix)
-
-#+clisp
-(setf *default-file-encoding*  (ext:make-encoding :charset charset:iso-8859-1))
+  #+clisp (ext:make-encoding :charset 'charset:iso-8859-1 :line-terminator :unix))
 
 ;; Map exceptional but useful characters to the [0-255] range for a single-byte encoding
 ;; Add more here...
@@ -28,13 +28,13 @@
    (#.(code-char #x2039) . #x8B)	; Single left angle quotation mark: 8249 -> 139
    (#.(code-char #x203A) . #x9B)	; Single right angle quotation mark: 8250 -> 155
    (#.(code-char #x2122) . #x99)	; Trademark: 8482 -> 153
-) )
+))
 
 ;; Charset for strings mentioned outside content streams, e.g. in outlines.
 ;; See #<method write-object (string &optional root-level)>
 (defvar *default-charset*
-  #+(and lispworks win32) (ef::ef-coded-character-set win32:*multibyte-code-page-ef*)
-  #-(and lispworks win32) *char-single-byte-codes*)	; last resort
+  #+(and lispworks5 win32) (ef::ef-coded-character-set win32:*multibyte-code-page-ef*)
+  #-(and lispworks5 win32) *char-single-byte-codes*)	; last resort
 
 (defvar *min-size-for-compression* 300)
 

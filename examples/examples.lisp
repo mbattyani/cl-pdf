@@ -551,5 +551,5 @@
                 (apply #'pdf:set-rgb-fill (hsv->rgb (/ x 9.1) 1 1))
                 (pdf:set-transparency (/ y 9.0) bm)
                 (pdf:circle (* x 50) (* y 80) 30)
-                (pdf:fill-path))))))
-      (pdf:write-document file))))
+                (pdf:fill-path)))))))
+    (pdf:write-document file)))
