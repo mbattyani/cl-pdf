@@ -8,7 +8,7 @@
 ;;; depending on your Lisp implementation/OS/installation.
 
 (defconstant +external-format+
-  #-(or sbcl lispworks clisp allegro) :default
+  #-(or sbcl lispworks clisp allegro ccl) :default
   #+abcl '(:iso-8859-1 :eol-style :lf)
   #+ecl '(:latin-1 :lf)
   #+ccl :latin1
