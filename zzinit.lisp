@@ -26,7 +26,7 @@ force loading of the font data."
 (defun confirm-afm-files-directories ()
   (let (nonexistent)
     (dolist (directory *afm-files-directories*)
-      (unless (probe-file directory)
+      (unless (#-clisp probe-file #+clisp ext:probe-directory directory)
 	(pushnew directory nonexistent :test #'equalp)))
     (when nonexistent 
       (warn "You have set the following non-existent director~@p in *afm-files-directories*:
