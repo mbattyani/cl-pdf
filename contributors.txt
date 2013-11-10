@@ -18,6 +18,7 @@ Gary Warren King (MCL port)
 Klaus Weidner (std color names)
 Edi Weitz (cmucl zlib)
 Leo Zovic (non uniform round corners for rectangle and polyline)
+Peter Heslin (Using zpb-ttf to load Unicode ttf files)
 
 I apologize if I've missed someone. Please let me know if that's the case.
 

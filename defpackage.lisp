@@ -46,7 +46,7 @@
    #:draw-centered-text #:draw-left-text #:draw-right-text
    #:vertical-value-axis #:horizontal-histo-axis #:legend #:histogram #:draw-object
    #:pie-chart #:plot-xy
-   #:load-t1-font #:load-ttu-font #:encoding #:get-encoding
+   #:load-t1-font #:load-ttu-font #:load-ttf-font #:encoding #:get-encoding
    #:draw-bar-code128 #:*page-number*
    #:test-template #:make-template-from-page #:add-templates-to-page #:draw-template
    #:image-file-parse-error #:initialize! #:confirm-afm-files-directories))
