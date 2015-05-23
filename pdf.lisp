@@ -28,7 +28,8 @@
   (push (cons name value)(dict-values dict)))
 
 (defun get-dict-value (dict name)
-  (cdr (assoc name (dict-values dict) :test #'string=)))
+  (when dict
+   (cdr (assoc name (dict-values dict) :test #'string=))))
 
 (defun change-dict-value (dict name value)
   (let ((key-val (assoc name (dict-values dict) :test #'string=)))
