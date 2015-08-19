@@ -15,6 +15,7 @@
    #:*letter-portrait-page-bounds* #:*letter-landscape-page-bounds*
    #:*a4-portrait-page-bounds* #:*a4-landscape-page-bounds*
    #:*default-page-bounds*
+   #:bounds #:*load-images-lazily*
    #:load-fonts #:get-font #:font #:clear-font-cache #:name #:encoding #:font-metrics #:add-font-to-page
    #:font-name #:full-name #:family-name #:weight #:font-bbox #:*version* #:notice #:encoding-scheme
    #:characters #:code #:width #:bbox #:kernings #:get-font-descender

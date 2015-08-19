@@ -399,7 +399,7 @@
                        (error-message condition))))))
 
 (defclass jpeg-image (bitmap-image)
-  ())
+  ((filename :accessor filename :initarg :filename)))
 
 (defun %read-jpeg-file% (filename &key header-only)
   (with-open-file (s filename :direction :input :element-type '(unsigned-byte 8))
@@ -435,6 +435,7 @@
       (%read-jpeg-file% filename :header-only header-only)
     (when nb-components
       (make-instance 'jpeg-image :nb-components nb-components
+		     :filename filename
 		     :width width :height height :data data))))
 
 (defgeneric make-jpeg-image (jpeg))
@@ -468,5 +469,6 @@
          :bits (data jpeg)
          :width (width jpeg) :height (height jpeg)
          :filter "/DCTDecode"
+	 :filename (filename jpeg)
          :color-space (aref +jpeg-color-spaces+ (nb-components jpeg))
          :no-compression t))
