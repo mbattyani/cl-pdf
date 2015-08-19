@@ -90,3 +90,6 @@
 (defvar *a4-landscape-page-bounds* #(0 0 841 595))
 (defvar *letter-landscape-page-bounds* #(0 0 792 612))
 (defvar *default-page-bounds* *a4-portrait-page-bounds*)
+
+
+(defvar *load-images-lazily* nil)
