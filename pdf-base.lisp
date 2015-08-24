@@ -466,9 +466,10 @@
 
 (defmethod make-image ((jpeg jpeg-image) &key &allow-other-keys)
   (make-instance 'pdf:image
-         :bits (data jpeg)
+         :bits (if *load-images-lazily*
+		   #'(lambda () (data (read-jpeg-file (filename jpeg))))
+		   (data jpeg))
          :width (width jpeg) :height (height jpeg)
-         :filter "/DCTDecode"
-	 :filename (filename jpeg)
+         :filter "/DCTDecode" 
          :color-space (aref +jpeg-color-spaces+ (nb-components jpeg))
          :no-compression t))

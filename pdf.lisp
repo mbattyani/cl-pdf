@@ -50,14 +50,7 @@
 			      (reduce #'+ content :key #'length)
 			      (length content)))))))
 
-(defclass lazy-pdf-stream (pdf-stream)
-  ((content :accessor content :initform "" :initarg :content)
-   (filename :accessor filename :initarg :filename)
-   (offset :accessor offset :initform 0 :initarg :offset)))
-
-(defmethod initialize-instance :after ((obj lazy-pdf-stream) &key  &allow-other-keys)
-  (change-dict-value obj "/Length" (length (content obj)))
-  (setf (content obj) nil))
+(defclass lazy-pdf-stream (pdf-stream) ())
 
 (defun compress-pdf-stream (pdf-stream)
 ;  #+use-no-zlib (declare (ignore pdf-stream))
@@ -403,7 +396,7 @@
   (when (stringp color-space)
     (enforce-/ color-space))
   (setf (content image)
-	(make-instance 'pdf-stream
+	(make-instance (if (functionp bits) 'lazy-pdf-stream 'pdf-stream)
 	       :no-compression no-compression
 	       :dict-values `(("/Type" . "/XObject")("/Subtype" . "/Image")
 			      ("/Width" . ,width)("/Height" . ,height)
@@ -415,11 +408,7 @@
 			      ("/BitsPerComponent" . ,bits-per-color)
                               ,@(when decode `(("/Decode" . ,decode)))
                               ,@(when mask `(("/Mask" . ,mask))) )))
-  (setf (content (content image)) bits)
-  (if (and *load-images-lazily* (filename image))
-      (setf (content image) (make-instance 'lazy-pdf-stream 
-					   :filename (filename image)
-					   :dict-values (dict-values (content image))))))
+  (setf (content (content image)) bits))
 
 (defun add-images-to-page (&rest images)
   (dolist (image images)
@@ -488,12 +477,6 @@
 (defmethod write-stream-content ((obj list))
   (map nil 'write-stream-content obj))
 
-(defmethod write-stream-content ((obj stream))
-  (let ((buffer (make-array 4096 :element-type (stream-element-type obj))))
-    (loop for position = (read-sequence buffer obj)
-	 while (plusp position)
-	 do (write-sequence buffer *pdf-stream*))))
-
 (defmethod write-object ((obj pdf-stream) &optional root-level)
   (declare (ignorable root-level))
   (compress-pdf-stream obj)
@@ -505,12 +488,10 @@
 
 (defmethod write-object ((obj lazy-pdf-stream) &optional root-level)
   (declare (ignorable root-level))
-  (call-next-method)
-  (write-line "stream" *pdf-stream*)
-  (with-open-file (contents (filename obj) :direction :input :element-type '(unsigned-byte 8))
-    (write-stream-content contents))
-  (write-char #\Newline *pdf-stream*)
-  (write-line "endstream" *pdf-stream*))
+  (let ((dstream (make-instance 'pdf-stream 
+				:content (funcall (content obj))
+				:dict-values (dict-values obj))))
+    (write-object dstream root-level)))
 
 (defmethod write-object ((obj object-ref) &optional root-level)
   (declare (ignorable root-level))
