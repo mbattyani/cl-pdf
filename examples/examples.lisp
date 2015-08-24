@@ -553,3 +553,15 @@
                 (pdf:circle (* x 50) (* y 80) 30)
                 (pdf:fill-path)))))))
     (pdf:write-document file)))
+
+;;; Example 11: lazy image loading
+(defun example11 (&optional (file #p"/tmp/ex11.pdf"))
+  (let ((pdf:*load-images-lazily* t))
+    (pdf:with-document ()
+      (loop for f in (directory (merge-pathnames "*.png"))
+	 do (pdf:with-page ()
+	      (let ((jpg (pdf:make-image f)))
+		(setf (pdf:bounds pdf:*page*) (vector 0 0 (pdf:width jpg) (pdf:height jpg)))
+		(pdf:add-images-to-page jpg)
+		(pdf:draw-image jpg 0 0 (pdf:width jpg) (pdf:height jpg) 0 t))))
+      (pdf:write-document file))))

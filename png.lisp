@@ -40,6 +40,7 @@
 (defclass png-image (bitmap-image)
  ((bits-per-color :accessor bits-per-color :initarg :bits-per-color)
   ;(color-space :accessor color-space :initarg :color-space)
+  (filename :accessor filename :initarg :filename)
   (palette :accessor palette :initarg :palette)
   (mask :accessor mask :initarg :mask)))
 
@@ -134,6 +135,7 @@
                :message "Palette is missing"))
       (make-instance 'png-image :nb-components color-space
 		     :width width :height height  :data data
+		     :filename pathname
                      :bits-per-color bits-per-color  :palette palette  :mask mask)))))
 
 (defmethod make-image ((png png-image) &key &allow-other-keys)
@@ -151,7 +153,9 @@
 			       :no-compression t))))
          (mask (mask png)))
     (make-instance 'pdf:image
-         :bits (data png)
+         :bits (if *load-images-lazily*
+		   #'(lambda () (data (read-png-file (filename png))))
+		   (data png))
          :width (width png) :height (height png)
          :color-space (if (string= nb-components "Indexed")
                           (vector (pdf-name nb-components)
