@@ -490,6 +490,16 @@ Returns the first unused object-number."
       (change-dict-value dict "/Contents" *current-content*))
     page))
 
+(defun remove-page (page-num)
+  (let ((page (aref (pages *root-page*) page-num)))
+    (setf (pages *root-page*)
+	  (remove page (pages *root-page*)))
+    (change-dict-value (content *root-page*) "/Count" #'(lambda () (length (pages *root-page*))))
+    (change-dict-value (content *root-page*) "/Kids" (pages *root-page*))))
+
+
+(export 'remove-page)
+
 (defmacro with-existing-document ((file &key (creator "") author title subject keywords) &body body)
   `(let* ((*document* (read-pdf-file ,file))
 	  (*root-page* (root-page *document*))
