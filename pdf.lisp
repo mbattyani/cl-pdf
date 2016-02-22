@@ -37,6 +37,11 @@
 	(setf (cdr key-val) value)
 	(add-dict-value dict name value))))
 
+(defun copy-dict (dict)
+  (when dict
+    (make-instance 'dictionary
+		   :dict-values (copy-alist (dict-values dict)))))
+
 (defclass pdf-stream (dictionary)
   ((content :accessor content :initform "" :initarg :content)
    (no-compression :accessor no-compression :initarg :no-compression :initform nil)))

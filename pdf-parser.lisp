@@ -490,6 +490,44 @@ Returns the first unused object-number."
       (change-dict-value dict "/Contents" *current-content*))
     page))
 
+(defun copy-page (page-num)
+  (let* ((src-page (aref (pages *root-page*) page-num))
+	 (src-dict (content src-page))
+	 (resources (copy-dict (ensure-dictionary (get-dict-value src-dict "/Resources"))))
+	 (fonts (copy-dict (ensure-dictionary (get-dict-value resources "/Font"))))
+	 (xobjects (copy-dict (ensure-dictionary (get-dict-value resources "/XObject"))))
+	 (new-page (make-instance 'page))
+	 (new-dict (content new-page))
+	 (content-stream (make-instance 'pdf-stream)))
+    (setf *original-content* (get-dict-value src-dict "/Contents"))
+    (setf *current-content* (make-array 10 :fill-pointer 0 :adjustable t))
+    (unless resources
+      (setf resources (make-instance 'dictionary)))
+    (change-dict-value new-dict "/Resources" resources)
+    (unless fonts
+      (setf fonts (make-instance 'dictionary)))
+    (change-dict-value resources "/Font" fonts)
+    (unless xobjects
+      (setf xobjects (make-instance 'dictionary)))
+    (change-dict-value resources "/XObject" xobjects)
+    (setf (bounds new-page) (get-dict-value src-dict "/MediaBox")
+	  (resources new-page) resources
+	  (font-objects new-page) fonts
+	  (xobjects new-page) xobjects
+	  (content-stream new-page) content-stream)
+    (change-dict-value new-dict "/Contents" *current-content*)
+    new-page))
+
+(defun remove-page (page-num)
+  (let ((page (aref (pages *root-page*) page-num)))
+    (setf (pages *root-page*)
+	  (remove page (pages *root-page*)))
+    (change-dict-value (content *root-page*) "/Count" #'(lambda () (length (pages *root-page*))))
+    (change-dict-value (content *root-page*) "/Kids" (pages *root-page*))))
+
+
+(export 'remove-page)
+
 (defmacro with-existing-document ((file &key (creator "") author title subject keywords) &body body)
   `(let* ((*document* (read-pdf-file ,file))
 	  (*root-page* (root-page *document*))
@@ -501,10 +539,12 @@ Returns the first unused object-number."
 
 (export 'with-existing-document)
 
-(defmacro with-existing-page ((page-number) &body body)
+(defmacro with-existing-page ((page-number &key copy-p) &body body)
   `(let* ((*original-content* nil)
 	  (*current-content* nil)
-	  (*page* (open-page ,page-number)))
+	  (*page* (if ,copy-p
+		      (copy-page ,page-number)
+		      (open-page ,page-number))))
      (setf (content (content-stream *page*))
 	   (let ((*page-stream* (make-string-output-stream)))
 	     ,@body
