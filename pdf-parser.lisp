@@ -497,7 +497,7 @@ Returns the first unused object-number."
 	 (fonts (copy-dict (ensure-dictionary (get-dict-value resources "/Font"))))
 	 (xobjects (copy-dict (ensure-dictionary (get-dict-value resources "/XObject"))))
 	 (new-page (make-instance 'page))
-	 (new-dict (content new-page))
+	 (new-dict (setf (content new-page) (copy-dict src-dict)))
 	 (content-stream (make-instance 'pdf-stream)))
     (setf *original-content* (get-dict-value src-dict "/Contents"))
     (setf *current-content* (make-array 10 :fill-pointer 0 :adjustable t))
