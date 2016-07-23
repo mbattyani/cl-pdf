@@ -456,9 +456,10 @@
   (cond ((member type '("jpeg" "jpg") :test #'equalp)
          (apply 'make-image (read-jpeg-file object) args))
         ((equalp type "png")
-         (apply 'make-image (read-png-file object) args))
-        (t (error 'image-file-parse-error :stream object
-                  :message (format nil "Unsupported image file type ~s" type)))))
+         (apply 'make-image (read-png-file2 object) args))
+        (t (or (apply 'make-image (read-convert-jpg-file object) args)
+	       (error 'image-file-parse-error :stream object
+		      :message (format nil "Unsupported image file type ~s" type))))))
 
 (defmethod make-image ((object string) &rest args &key type)
   (apply #'make-image (merge-pathnames object (make-pathname :type type))
@@ -473,3 +474,24 @@
          :filter "/DCTDecode" 
          :color-space (aref +jpeg-color-spaces+ (nb-components jpeg))
          :no-compression t))
+
+(defun %generate-temp-filename% (filename filetype)
+  (make-pathname :directory (pathname-directory (uiop:temporary-directory))
+		 :name filename :type filetype))
+
+(defun %convert-image-file% (source target &rest options)
+  (uiop:run-program
+   (format nil "convert ~a ~{~a ~}~a" source options target)))
+
+(defun %read-convert-jpg-file% (pathname header-only)
+  (let ((temp-jpg  (%generate-temp-filename% (pathname-name pathname) "jpg")))
+    (%convert-image-file% pathname temp-jpg "-alpha" "remove")
+    (prog1
+	(read-jpeg-file temp-jpg :header-only header-only)
+      (uiop:delete-file-if-exists temp-jpg))))
+
+(defun read-convert-jpg-file (pathname &key header-only)
+   (multiple-value-bind (retval err2)
+       (ignore-errors
+	 (%read-convert-jpg-file% pathname header-only))
+	(if err2 nil retval)))
