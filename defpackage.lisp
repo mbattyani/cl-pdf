@@ -34,7 +34,7 @@
    #:set-line-width #:set-line-cap #:set-line-join #:set-dash-pattern
    #:set-miter-limit #:move-to #:line-to #:bezier-to #:bezier2-to #:bezier3-to
    #:arc #:pie #:circle #:ellipse #:rectangle #:polyline #:regular-polygon #:star
-   #:close-sub-path #:basic-rect #:stroke #:close-and-stroke #:fill-path #:close-and-fill #:even-odd-fill
+   #:close-path #:basic-rect #:stroke #:close-and-stroke #:fill-path #:close-and-fill #:even-odd-fill
    #:fill-and-stroke #:even-odd-fill-and-stroke #:close-fill-and-stroke
    #:close-even-odd-fill-and-stroke #:end-path-no-op #:clip-path #:even-odd-clip-path
    #:set-gray-stroke #:set-gray-fill #:set-rgb-stroke #:set-rgb-fill #:set-cymk-stroke
