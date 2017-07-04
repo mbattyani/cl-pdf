@@ -173,3 +173,10 @@
                          ("/BitsPerComponent" . ,(bits-per-color png))
                          ("/Columns" . ,(width png)))
          :no-compression t)))				; data bits already come compressed
+
+(defun read-png-file2 (pathname &key header-only)
+  (handler-case
+      (read-png-file pathname :header-only header-only)
+    (image-file-parse-error (err)
+      (or (read-convert-jpg-file pathname :header-only header-only)
+	  err))))
