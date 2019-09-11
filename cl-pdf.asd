@@ -12,12 +12,15 @@
 (in-package #:cl-pdf-system)
 
 ;;;Choose the zlib implementation you want to use (only one!)
+;; Put one of those preferably somewhere else than in that file
 (eval-when (:load-toplevel :compile-toplevel :execute)
   ;;(pushnew :use-salza2-zlib *features*)
   ;;(pushnew :use-salza-zlib *features*)
   ;;(pushnew :use-uffi-zlib *features*)
   ;;(pushnew :use-abcl-zlib *features*)
-  (pushnew :use-no-zlib *features*)
+  (when (notany #'(lambda (feature) (find feature *features*))
+                '(:use-salza2-zlib :use-salza-zlib :use-uffi-zlib :use-abcl-zlib :use-no-zlib))
+    (push :use-no-zlib *features*))
   )
 
 #-(or use-uffi-zlib use-salza-zlib use-salza2-zlib use-abcl-zlib use-no-zlib)
