@@ -260,6 +260,48 @@
 	    (with-saved-state
 		(draw-chars string line-height line-width font font-size segs-per-char)))))))
 
+
+(defun draw-qr-code (matrix x y &key (point-size 2))
+  "Draws a quadratic 2D MATRIX at X, Y as a QR code.
+  The matrix elements can be 0 or 1, or :DARK, :FDARK, :LIGHT, :FLIGHT
+  (so that CL-QRENCODE:ENCODE-SYMBOL results can be easily used).
+  POINT-SIZE gives the size per pixel."
+  (let* ((dims (array-dimensions matrix))
+         (size (first dims))
+         (lin-total (make-array (array-total-size matrix)
+                                :displaced-to matrix
+                                :displaced-index-offset 0)))
+    (when (or (/= 2 (length dims))
+              (/= size
+                  (second dims)))
+      (error "~s is not a quadratic matrix" matrix))
+    ;;
+    (flet ((dark? (x)
+             (or (eql x 1)
+                 (eq  x :dark)
+                 (eq  x :fdark))))
+      (with-saved-state
+        (translate x y)
+        ;; Axis goes down!
+        (scale point-size (- point-size))
+        (loop for x below size
+              for linear = (make-array size
+                                       :displaced-to lin-total
+                                       :displaced-index-offset (* x size))
+              do (let ((y 0))
+                   (translate 1 0)
+                   ;; Do run-length encoding to reduce the PDF size
+                   (loop while (< y size)
+                         for dark-start = (position-if #'dark? linear :start y)
+                         while dark-start
+                         do (let* ((dark-end (position-if-not #'dark? linear :start dark-start))
+                                   (end2 (or dark-end size)))
+                              (rectangle 0 dark-start
+                                         1 (- end2 dark-start))
+                              (setf y (1+ end2))))
+                   (fill-path)))))))
+
+
 ;;
 ;; Pres test code
 ;;
@@ -274,6 +316,28 @@
 	   (pdf:rotate 90)
 	   (pdf:translate 500 -300)
 	   (pdf:rotate 5)	   
+       (draw-qr-code #2a((1 1 1 1 1 1 1 0 0 1 1 0 0 0 1 1 1 1 1 1 1)
+                         (1 0 0 0 0 0 1 0 0 1 0 0 0 0 1 0 0 0 0 0 1)
+                         (1 0 1 1 1 0 1 0 0 1 0 1 0 0 1 0 1 1 1 0 1)
+                         (1 0 1 1 1 0 1 0 0 0 0 1 0 0 1 0 1 1 1 0 1)
+                         (1 0 1 1 1 0 1 0 0 1 0 0 1 0 1 0 1 1 1 0 1)
+                         (1 0 0 0 0 0 1 0 1 1 0 1 1 0 1 0 0 0 0 0 1)
+                         (1 1 1 1 1 1 1 0 1 0 1 0 1 0 1 1 1 1 1 1 1)
+                         (0 0 0 0 0 0 0 0 0 1 0 1 1 0 0 0 0 0 0 0 0)
+                         (1 0 0 1 0 1 1 0 1 0 0 0 0 1 0 1 0 0 0 0 0)
+                         (0 0 0 0 1 1 0 0 0 1 0 0 0 0 1 0 0 0 1 0 0)
+                         (1 1 0 0 0 0 1 0 0 1 1 0 1 1 0 0 0 0 0 1 1)
+                         (1 1 1 0 1 1 0 1 0 0 0 1 0 0 0 0 0 0 1 0 0)
+                         (0 0 0 1 0 1 1 1 0 0 0 0 1 0 1 0 1 1 1 0 1)
+                         (0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 1 1 0 1 0 1)
+                         (1 1 1 1 1 1 1 0 0 1 0 0 0 1 0 1 0 1 1 0 0)
+                         (1 0 0 0 0 0 1 0 1 1 0 1 1 1 0 1 1 1 1 0 1)
+                         (1 0 1 1 1 0 1 0 0 1 1 1 0 0 1 1 1 1 1 1 1)
+                         (1 0 1 1 1 0 1 0 1 1 1 1 0 0 0 1 0 1 0 1 1)
+                         (1 0 1 1 1 0 1 0 0 0 1 0 1 0 0 0 1 0 0 0 1)
+                         (1 0 0 0 0 0 1 0 0 1 0 0 0 1 1 1 1 1 0 0 1)
+                         (1 1 1 1 1 1 1 0 1 0 0 1 1 0 0 0 1 1 1 0 0))
+                     100 100)
 	   (draw-bar-code128 str 0 0 :height 300 :width 600 :start-stop-factor 0.2 :font-size 40 :show-string t))))
   (pdf:write-document to-file)))
 

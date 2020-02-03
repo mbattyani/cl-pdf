@@ -48,6 +48,6 @@
    #:vertical-value-axis #:horizontal-histo-axis #:legend #:histogram #:draw-object
    #:pie-chart #:plot-xy
    #:load-t1-font #:load-ttu-font #:load-ttf-font #:encoding #:get-encoding
-   #:draw-bar-code128 #:*page-number*
+   #:draw-bar-code128 #:draw-qr-code #:*page-number*
    #:test-template #:make-template-from-page #:add-templates-to-page #:draw-template
    #:image-file-parse-error #:initialize! #:confirm-afm-files-directories))
