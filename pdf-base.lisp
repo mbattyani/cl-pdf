@@ -325,6 +325,7 @@
                (:SoftLight "/SoftLight")
                (:difference "/Difference")
                (:exclusion "/Exclusion")
+               (:hue "/Hue")
                (:saturation "/Saturation")
                (:color "/Color")
                (:luminosity "/Luminosity"))))
