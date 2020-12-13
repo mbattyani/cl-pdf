@@ -167,14 +167,21 @@ package), array (Lisp vector), dictionary (Lisp property list), stream
 
 ;;; Strings
 
+;; See "7.3.4.2 Literal Strings" in
+;; https://www.adobe.com/content/dam/acom/en/devnet/pdf/pdfs/PDF32000_2008.pdf
 (defun read-pdf-string ()
   ;; TODO: Deal with encodings.
   (with-output-to-string (s)
     (write-char #\( s)
-    (loop for prev-char = #\( then char
+    (loop with paren-count = 0
+          for prev-char = #\( then char
           for char = (read-char *pdf-input-stream*)
-          until (and (char= char #\))(not (char= prev-char #\\)))
-	  do (write-char char s))
+          do (unless (char= prev-char #\\)
+               (cond ((char= char #\() (incf paren-count))
+                     ((char= char #\))
+                      (when (eql 0 paren-count) (return))
+                      (decf paren-count))))
+             (write-char char s))
     (write-char #\) s)))
 
 (defun read-hex-string ()
