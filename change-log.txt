@@ -1,19 +1,23 @@
 ;;; cl-pdf copyright 2002-2004 Marc Battyani see license.txt for details of the license
 ;;; You can reach me at marc.battyani@fractalconcept.com or marc@battyani.net
 
-This is the change log for cl-pdf. 
+This is the change log for cl-pdf.
 See also contributors.txt and to-do.txt
 
 Current version:
+   This release supports features in the PDF 1.4 specification
+
+14 December 2020:
+   Provide ability for signaling information about parsing errors
 
 08 February 2004: Release 2.1
    Added Custom encodings.  [Thanks to Dmitri Ivanov]
    Fonts without font data. [Thanks to Dmitri Ivanov]
-   Added a few with-standard-io-syntax so that the pdf are generated 
+   Added a few with-standard-io-syntax so that the pdf are generated
          correctly when people change the printer settings.
    Added a :stacked-series option to the histograms.
    Changed zlib (again!) for dynamic loading of the library in delivered applications.
-   Added a *default-encoding* special variable. 
+   Added a *default-encoding* special variable.
    Added pdf meta information to documents.[Thanks to Eric Marsden]
    Corrected handling of the min/max-value in the charts.[Thanks to Eric Marsden]
    Corrected pfb file loading.
@@ -70,20 +74,20 @@ Current version:
 
 09 December 2002:
    Added ASDF and mk:defsystem files.
-   Converted the zlib compress FFI to UFFI. 
+   Converted the zlib compress FFI to UFFI.
    Moved previous zlib versions and previous defsystems to a contrib directory.
 
 02 August 2002:
    Added very basic formatted text (centered, left, right) outputs
    Added some basic charts (histogram, pie chart, legend, axis)
 
-10 June 2002: 
+10 June 2002:
    Added support for JPEG images
    Added outlines
    Added internal and URL links.
 
 13 February 2002: Release 0.45
-   Added compression for CMUCL 
+   Added compression for CMUCL
    Compression is now optional
    Bugs corrected (ACL compress, with-* macros, etc)
    Improved arc functions, new example 6
@@ -100,7 +104,7 @@ Current version:
    Cleaned up the code, put back write-line, removed gensym, etc.
    Added a maze generation example
 
-29 january 2002: Release 0.21 
+29 january 2002: Release 0.21
    Corrected example4 in examples.lisp
    Renaming the pdf directory as cl-pdf-<release number>
 
