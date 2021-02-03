@@ -114,7 +114,7 @@
 (defun string-to-octets (string start end)
   "Convert STRING to a sequence of octets, if possible."
   (declare (type string string)
-	   (type buffer-offset start end)
+	   (type fixnum start end)
 	   (optimize (speed 3) (safety 0)))
   #+(and sbcl (not octet-characters))
   (sb-ext:string-to-octets string :external-format :iso-8859-1 :start start :end end)
