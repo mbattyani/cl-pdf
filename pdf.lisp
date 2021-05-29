@@ -83,14 +83,37 @@
    (author :accessor author :initarg :author :initform nil)
    (title  :accessor title :initarg :title :initform nil)
    (keywords :accessor keywords :initarg :keywords :initform nil)
-   (subject :accessor subject :initarg :subject :initform nil)))
+   (subject :accessor subject :initarg :subject :initform nil)
+   (creation-date :type (or null (eql :now) (integer 0))
+                  :accessor creation-date
+                  :documentation
+                  #.(format nil "Creation date as a positive integer, :NOW or ~
+                     NIL. A positive integer designates an absolute ~
+                     universal time. :NOW designates the current universal ~
+                     time when the document is rendered. NIL causes the ~
+                     creation date to be omitted from the document"))
+   (modification-date :type (or null (eql :now) (integer 0))
+                      :accessor modification-date
+                      :documentation
+                      #.(format nil "Modification date as a positive integer, ~
+                         :NOW or NIL. A positive integer designates an ~
+                         absolute universal time. :NOW designates the current ~
+                         universal time when the document is rendered. NIL ~
+                         causes the modification date to be omitted from the ~
+                         document"))))
 
 (defmethod initialize-instance :after ((doc document)
-				       &key empty mode layout
-				            (creator "") author title subject keywords
+                                       &key empty mode layout
+                                            creator
+                                            author
+                                            title
+                                            subject
+                                            keywords
+                                            (creation-date (get-universal-time))
+                                            (modification-date creation-date)
                                        &allow-other-keys)
  ;;; Args: empty  If true, do not set any slots
-  ;;       mode	  PageMode in catalog
+  ;;       mode           PageMode in catalog
   ;;       layout PageLayout in catalog
   (unless empty
     (let ((*document* doc))
@@ -99,7 +122,7 @@
             (root-page doc) (make-instance 'page-node)
             (outline-root doc) (make-instance 'outline)
             (content (catalog doc))
-	     (make-instance 'dictionary :dict-values
+             (make-instance 'dictionary :dict-values
               `(("/Type" . "/Catalog")
                 ("/Pages" . ,(root-page doc))
                 ,@(when layout `(("/PageLayout" . ,(case layout
@@ -113,24 +136,43 @@
                                                  (:outlines "/UseOutlines")
                                                  (:thumbs   "/UseThumbs")
                                                  (:full     "/FullScreen")
-                                                 (otherwise (pdf-name mode)))))) )))
+                                                 (otherwise (pdf-name mode))))))))
+             (creation-date doc) creation-date
+             (modification-date doc) modification-date)
       (add-doc-info doc :creator creator :author author
-		    :title title :subject subject :keywords keywords) )))
+                        :title title :subject subject
+                        :keywords keywords
+                        :creation-date creation-date
+                        :modification-date modification-date))))
 
-(defun add-doc-info (doc &key (creator "") author title subject keywords)
+(defun human-readable-time<-universal-time (universal-time)
+  (multiple-value-bind (second minute hour date month year)
+      (decode-universal-time universal-time)
+    (format nil "(D:~D~2,'0D~2,'0D~2,'0D~2,'0D~2,'0D)"
+            year month date hour minute second)))
+
+(defun universal-time<-time-spec (time-spec)
+  (case time-spec
+    (:now (get-universal-time))
+    (t time-spec)))
+
+(defun add-doc-info (doc &key creator author title subject keywords
+                              creation-date modification-date)
   (setf (docinfo doc) (make-instance 'indirect-object))
   (setf (content (docinfo doc))
-	(make-instance 'dictionary
-		       :dict-values `(("/Creator" . ,(format nil "(cl-pdf ~A - ~A)" *version* creator))
-				      ,@(when author `(("/Author" . ,(format nil "(~A)" author))))
-				      ,@(when title `(("/Title" . ,(format nil "(~A)" title))))
-				      ,@(when subject `(("/Subject" . ,(format nil "(~A)" subject))))
-				      ,@(when keywords `(("/Keywords" . ,(format nil "(~A)" keywords))))
-				      ("/CreationDate" .
-                                          ,(multiple-value-bind (second minute hour date month year)
-					       (get-decoded-time)
-					     (format nil "(D:~D~2,'0D~2,'0D~2,'0D~2,'0D~2,'0D)"
-						     year month date hour minute second)))))))
+        (make-instance 'dictionary
+                       :dict-values `(("/Creator" . ,(format nil "(cl-pdf ~A~@[ - ~A~])"
+                                                             *version* creator))
+                                      ,@(when author `(("/Author" . ,(format nil "(~A)" author))))
+                                      ,@(when title `(("/Title" . ,(format nil "(~A)" title))))
+                                      ,@(when subject `(("/Subject" . ,(format nil "(~A)" subject))))
+                                      ,@(when keywords `(("/Keywords" . ,(format nil "(~A)" keywords))))
+                                      ,@(when creation-date
+                                          `(("/CreationDate" . ,(human-readable-time<-universal-time
+                                                                 (universal-time<-time-spec creation-date)))))
+                                      ,@(when modification-date
+                                          `(("/ModDate" . ,(human-readable-time<-universal-time
+                                                            (universal-time<-time-spec modification-date)))))))))
 
 (defclass indirect-object ()
   ((obj-number :accessor obj-number :initform (incf (last-object-number *document*)) :initarg :obj-number)
@@ -280,7 +322,7 @@
 	(with-slots ((reference reference)(prev-outline prev-outline)(next-outline next-outline)) outline
 	  (setf (content outline)
 		(make-instance 'dictionary
-  		   :dict-values `(,@(if parent `(("/Title" . ,(pdf-string (title outline)))
+                   :dict-values `(,@(if parent `(("/Title" . ,(pdf-string (title outline)))
 						 ("/Parent" . ,parent))
 					'(("/Type" "/Outlines")))
 				  ,@(when first `(("/First" . ,first)))
@@ -493,7 +535,7 @@
 
 (defmethod write-object ((obj lazy-pdf-stream) &optional root-level)
   (declare (ignorable root-level))
-  (let ((dstream (make-instance 'pdf-stream 
+  (let ((dstream (make-instance 'pdf-stream
 				:content (funcall (content obj))
 				:dict-values (dict-values obj))))
     (write-object dstream root-level)))
