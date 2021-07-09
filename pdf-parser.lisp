@@ -550,7 +550,7 @@ Returns the first unused object-number."
 (export 'with-existing-document)
 
 (defmacro with-existing-page ((page-number &key copy-p) &body body)
-  `(let ((*original-content* nil)
+  `(let* ((*original-content* nil)
 	  (*current-content* nil)
 	  (*page* (if ,copy-p
 		      (copy-page ,page-number)
