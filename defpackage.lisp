@@ -40,7 +40,8 @@
    #:set-gray-stroke #:set-gray-fill #:set-rgb-stroke #:set-rgb-fill #:set-cymk-stroke
    #:set-color-stroke #:set-color-fill
    #:set-transparency #:set-fill-transparency #:set-stroke-transparency
-   #:set-cymk-fill #:paint-image #:draw-image #:get-named-reference #:register-page-reference
+   #:set-cymk-fill #:paint-image #:draw-image #:draw-centered-image
+   #:get-named-reference #:register-page-reference
    #:add-link #:add-URI-link #:add-external-link #:read-jpeg-file #:make-jpeg-image
    #:make-image #:width #:height
    #:enter-outline-level #:close-outline-level #:with-outline-level
