@@ -340,17 +340,24 @@
   (set-gstate "CA" (format nil "~3F" alpha)))
 
 (defun draw-image (image x y dx dy rotation &optional keep-aspect-ratio)
+  "Paint an image at (`x`,`y`), after rotating it counterclockwise by `rotation` degrees and scaling
+   it to `dx`X`dy` points (subject to the `keep-aspect-ratio` boolean).
+
+   Note that the rotation is actually accomplished by rotating the page clockwise, so the (`x`,`y`)
+   coordinates point to the 'logical' left-bottom corner of the image.
+   I.e.: with (= rotation 0) they are the coordinates of the leftmost and bottommost point of the
+   image, while, e.g., with (= rotation 180) they mark the rightmost and topmost point."
   (when keep-aspect-ratio
     (let ((r1 (/ dy dx))
-	  (r2 (/ (height image)(width image))))
-      (if (> r1 r2)
-	(setf dy (* dx r2)))
-	(when (< r1 r2)(setf dx (/ dy r2)))))
+          (r2 (/ (height image) (width image))))
+      (cond
+        ((> r1 r2) (setf dy (* dx r2)))
+        ((< r1 r2) (setf dx (/ dy r2))))))
   (with-saved-state
-      (translate x y)
-      (rotate rotation)
-      (scale dx dy)
-      (paint-image image)))
+    (translate x y)
+    (rotate rotation)
+    (scale dx dy)
+    (paint-image image)))
 
 (defun draw-centered-image (image x y dx dy rotation &optional keep-aspect-ratio)
   "Paint an image centered at (`x`,`y`) after rotating it counterclockwise by `rotation` degrees
