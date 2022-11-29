@@ -538,7 +538,7 @@ Returns the first unused object-number."
 
 (export 'remove-page)
 
-(defmacro with-existing-document ((file &key (creator "") author title subject keywords) &body body)
+(defmacro with-existing-document ((file &key creator author title subject keywords) &body body)
   `(let* ((*document* (read-pdf-file ,file))
 	  (*root-page* (root-page *document*))
 	  (*page-number* 0)
