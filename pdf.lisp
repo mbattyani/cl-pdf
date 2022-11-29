@@ -158,21 +158,20 @@
 
 (defun add-doc-info (doc &key creator author title subject keywords
                               creation-date modification-date)
-  (setf (docinfo doc) (make-instance 'indirect-object))
-  (setf (content (docinfo doc))
-        (make-instance 'dictionary
-                       :dict-values `(("/Creator" . ,(format nil "(cl-pdf ~,2F~@[ - ~A~])"
-                                                             *version* creator))
-                                      ,@(when author `(("/Author" . ,(format nil "(~A)" author))))
-                                      ,@(when title `(("/Title" . ,(format nil "(~A)" title))))
-                                      ,@(when subject `(("/Subject" . ,(format nil "(~A)" subject))))
-                                      ,@(when keywords `(("/Keywords" . ,(format nil "(~A)" keywords))))
-                                      ,@(when creation-date
-                                          `(("/CreationDate" . ,(human-readable-time<-universal-time
-                                                                 (universal-time<-time-spec creation-date)))))
-                                      ,@(when modification-date
-                                          `(("/ModDate" . ,(human-readable-time<-universal-time
-                                                            (universal-time<-time-spec modification-date)))))))))
+  (let* ((info (or (docinfo doc) (make-instance 'indirect-object)))
+	 (dict (or (content info) (make-instance 'dictionary))))
+    (setf (docinfo doc) info)
+    (setf (content info) dict)
+    (when creator (change-dict-value dict "/Creator" (format nil "(cl-pdf ~,2F~@[ - ~A~])" *version* creator)))
+    (when author (change-dict-value dict "/Author" (format nil "(~A)" author)))
+    (when title (change-dict-value dict "/Title" (format nil "(~A)" title)))
+    (when subject (change-dict-value dict "/Subject" (format nil "(~A)" subject)))
+    (when keywords (change-dict-value dict "/Keywords" (format nil "(~A)" keywords)))
+    (when creation-date (change-dict-value dict "/CreationDate" (human-readable-time<-universal-time
+								 (universal-time<-time-spec creation-date))))
+    (when modification-date (change-dict-value dict "/ModDate" (human-readable-time<-universal-time
+								(universal-time<-time-spec modification-date))))
+    dict))
 
 (defclass indirect-object ()
   ((obj-number :accessor obj-number :initform (incf (last-object-number *document*)) :initarg :obj-number)
