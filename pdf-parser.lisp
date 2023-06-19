@@ -105,6 +105,9 @@
   (and (<= #x21 (char-code char) #x7E)
        (not (find char "%()<>[]{}/#"))))
 
+(defun extended-ascii-p (char)
+  (<= 128 (char-code char) 253))
+
 ;;; Skipping characters
 
 (defun eat-char (expected-char)
@@ -174,6 +177,10 @@ package), array (Lisp vector), dictionary (Lisp property list), stream
            ;; this is probably an empty indirect object.  WRITE-OBJECT
            ;; can write them, so we should be able to read them too.
            nil)
+          ((or (eql char #\R) (eql char #\U))
+           ;; Add this clause to avoid parsing error
+           ;; when it encouters "UNREAD" or "R" line. -- by H.Kuroda
+           nil)
           (t (unexpected-character-error char)))))
 
 (defun read-number ()
@@ -236,6 +243,8 @@ package), array (Lisp vector), dictionary (Lisp property list), stream
                                              (read-hex-digit)))
                                name))
 		  ((name-char-p char) (write-char char name))
+                  ((extended-ascii-p char) ; Extended ASCII -- by H.Kuroda
+		   (write-char char name))
 		  (t (unread-char char *pdf-input-stream*)
 		     (return)))))))
 
@@ -383,9 +392,11 @@ package), array (Lisp vector), dictionary (Lisp property list), stream
   "Read this many bytes at end of file to look for 'startxref'")
 
 (defun find-cross-reference-start ()
-  (let ((file-length (file-length *pdf-input-stream*))
-        (buffer (make-string +xref-search-size+)))
-    (file-position *pdf-input-stream* (- file-length +xref-search-size+))
+  (let* ((file-length (file-length *pdf-input-stream*))
+         (xref-search-size ; file-length can be smaller then +xref-search-size+
+          (min +xref-search-size+ file-length))
+         (buffer (make-string +xref-search-size+)))
+    (file-position *pdf-input-stream* (- file-length xref-search-size))
     (read-sequence buffer *pdf-input-stream*)
     (let ((position (search "startxref" buffer)))
       (unless position (unexpected-eof-error "file trailer"))
