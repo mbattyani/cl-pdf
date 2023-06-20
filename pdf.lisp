@@ -571,7 +571,16 @@
             else do (write-byte (char-external-code char *default-charset*) *pdf-stream*))
       (write-string obj *pdf-stream*))
   #-(and lispworks pdf-binary)
-  (write-string obj *pdf-stream*))
+  (if (char= #\/ (aref obj 0))          ; When obj is a NAME
+      (loop for char across obj
+	 if (or (whitespace-p char)     ; white or extended-ascii
+		(extended-ascii-p char))
+	 do
+	   (format *pdf-stream* "#~2,'0x" (char-code char))
+	 else do
+              (write-char char *pdf-stream*))
+      ;; When obj is a STRING
+    (write-string obj *pdf-stream*)))
 
 (defmethod write-object ((obj symbol) &optional root-level)
   (declare (ignorable root-level))

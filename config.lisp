@@ -14,8 +14,7 @@
   #+clasp :iso-8859-1
   #+ccl :latin1
   #+sbcl :latin-1
-  #+(and allegro mswindows) :octets
-  #+(and allegro unix) :default
+  #+allegro :octets
   #+lispworks '(:latin-1 :eol-style :lf)
   #+clisp (ext:make-encoding :charset 'charset:iso-8859-1 :line-terminator :unix))
 
