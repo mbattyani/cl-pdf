@@ -561,6 +561,9 @@
     (write-object obj)
     (write-char #\Space *pdf-stream*)))
 
+(defun extended-ascii-p (char)
+  (<= 128 (char-code char) 253))
+
 (defmethod write-object ((obj string) &optional root-level)
   (declare (ignorable root-level))
   #+(and lispworks pdf-binary)

@@ -105,9 +105,6 @@
   (and (<= #x21 (char-code char) #x7E)
        (not (find char "%()<>[]{}/#"))))
 
-(defun extended-ascii-p (char)
-  (<= 128 (char-code char) 253))
-
 ;;; Skipping characters
 
 (defun eat-char (expected-char)
